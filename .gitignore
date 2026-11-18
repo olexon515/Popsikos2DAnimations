@@ -1,0 +1,13 @@
+node_modules/
+dist/
+out/
+.env
+.env.local
+.DS_Store
+Thumbs.db
+__pycache__/
+*.py[cod]
+
+# User-generated voiceovers (keep public/sfx/ tracked as the base sound library)
+public/voices/
+public/voice.mp3
