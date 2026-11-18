@@ -8,7 +8,7 @@
 
 ## 0. Що це і як почати за 5 хвилин
 
-**Popsikos2DAnimations** — вертикальні 2D-мультфільми на тему апокаліпсису: **1080×1920, 30 fps**, уся графіка — SVG + React, без 3D і без растрових ассетів. Декорації винесені в модульні локації (`src/locations/`), звук синтезований локально (`generate_sfx.py`), діалоги та lip-sync генеруються з `public/voices/` (`build_dialogue.py`), титри — CSS-текст із comic-обводкою.
+**Popsikos2DAnimations** — вертикальні 2D-мультфільми на тему апокаліпсису: **1080×1920, 30 fps**, уся графіка — SVG + React, без 3D і без растрових ассетів. Декорації винесені в модульні локації (`src/locations/`), звук синтезований локально (`generate_sfx.py`), діалоги та lip-sync генеруються з `public/voices/` (`build_dialogue.py`), титри — CSS-текст із comic-обводкою, а 8 кінематографічних планів (wide → map) дає `src/ShotEngine.tsx`.
 
 | Параметр | Значення |
 |---|---|
@@ -79,6 +79,16 @@ npx remotion still src/index.ts Popsikos2DAnimations out/check-150.png --frame=1
 
 Обов'язкові кадри для перевірки після змін: **30** (заголовок), **118** (вихід заголовка), **150** (крик + підпис), **240** (склейка), **300** і **340** (Персонаж 2 + підпис), або відповідні ключові кадри нового сценарію. Дивись, що текст не закриває рот, немає щілин між шарами, гліфи не обрізані.
 
+Перевірка всіх 8 шотів (по одному кадру з середини кожного плану при `DURATION=1800`):
+
+```bash
+for f in 110 335 560 785 1010 1235 1460 1685; do
+  npx remotion still src/index.ts Popsikos2DAnimations out/shot-$f.png --frame=$f
+done
+```
+
+Окремо перевіряй стики планів (`cut`): кадр `224/225`, `449/450`, `674/675`, `899/900`, `1124/1125`, `1349/1350`, `1574/1575` — не має бути щілин, стрибків віньєтки або розмиття, що лишилось від `object-focus`.
+
 ### 1.6 Перевірка готового відео
 
 ```bash
@@ -115,9 +125,10 @@ ffmpeg -v info -ss 9 -t 1 -i out/episode.mp4 -vn -af volumedetect -f null NUL 2>
 | `src/index.ts` | `registerRoot(RemotionRoot)` |
 | `src/Root.tsx` | реєструє `<Composition id="Popsikos2DAnimations">` з `WIDTH/HEIGHT/FPS/DURATION` та `defaultProps={{ location: DEFAULT_LOCATION }}` |
 | `src/palette.ts` | `INK`, `PALETTE`, `WIDTH=1080`, `HEIGHT=1920`, `FPS=30`, `DURATION=TOTAL_FRAMES`, `HORIZON_Y=1180` |
-| `src/MainScene.tsx` | головна сцена: 3 шоти, `World` (рендерить обрану локацію), камера, `Atmosphere`, `<Audio>`, титри |
+| `src/MainScene.tsx` | головна сцена: 8 шотів через `CinematicShot`, `World` (рендерить обрану локацію + depth-of-field), `Atmosphere`, `<Audio>`, титри |
 | `src/Character.tsx` | SVG-маріонетка: очі, зіниці, рот, дихання, мова |
-| `src/Camera.tsx` | тип `Camera`, компонент `Layer` (паралакс), `rand`, `clamp`, `STATIC_CAMERA` |
+| `src/Camera.tsx` | тип `Camera`, компонент `Layer` (паралакс), `cameraTransform`, `rand`, `clamp`, `lerp`, `smoothstep`, `STATIC_CAMERA` |
+| `src/ShotEngine.tsx` | **Cinematic Shot Engine**: 8 пресетів (`ShotType`), `<CinematicShot>`, `TopDownPlate`, `TacticalMap` |
 | `src/TextOverlays.tsx` | `HookTitle` + `DynamicCaption` (spring, обводка, градієнт) |
 | `src/dialogueTimeline.ts` | автогенерований таймлайн реплік і lip-sync огинаючих із `public/voices/` |
 | `src/locations/types.ts` | TypeScript-інтерфейс `LocationDefinition`, `LocationLayerProps`, `LocationSkyProps` |
@@ -134,35 +145,55 @@ ffmpeg -v info -ss 9 -t 1 -i out/episode.mp4 -vn -af volumedetect -f null NUL 2>
 
 `MainScene` приймає `{ location = DEFAULT_LOCATION }: MainSceneProps`. Всередині:
 
-1. Три `<Sequence>` зі шотами (пропорційно `DURATION`: 1/3, 1/3, 1/3; за 12 с це 0–120, 120–240, 240–360).
+1. Вісім `<Sequence>` зі шотами - по одному на кожен `ShotType` (рівні частки `DURATION`; за 60 с це по 225 кадрів).
 2. `<Atmosphere />` — віньєтка, bloom, нижній fade (screen-space).
-3. `<Audio>`-шар (зациклений `wind_ambient`, SFX-хіти та `DIALOGUE` із `public/voices/`).
-4. `<Sequence>` з `HookTitle` і двома `DynamicCaption`.
+3. `<Audio>`-шар (зациклений `wind_ambient`, SFX-хіти на кожному каті та `DIALOGUE` із `public/voices/`).
+4. `<Sequence>` з `HookTitle` і трьома `DynamicCaption` (крупний план, POV, карта).
 
-| Частка тривалості | Шот | Персонаж | Камера |
+Демо-таймлайн (для `DURATION = 1800`, 60 с @ 30 fps):
+
+| Кадри | `ShotType` | Що в кадрі | Камера / ефект |
 |---|---|---|---|
-| 0 – 1/3 | широкий план (`ShotWide`) | Char 1: x=298 y=1632 scale=1.05, `normal`, дивиться вгору; Char 2: x=792 y=1668 scale=1.0 flipX, `squint` | zoom 1.0→1.12, panX 26→−24, panY −8→16 |
-| 1/3 – 2/3 | крупний план Char 1 (`ShotScream`) | x=540 y=1902 scale=2.05; `wide` з кадру 10, `scream` з кадру 13 (або lip-sync) | zoom 1.42→1.52, тремтіння 16→30→2.5 px, спалах, panY 360→396 |
-| 2/3 – кінець | крупний план Char 2 (`ShotTalk`) | x=548 y=1896 scale=2.0 flipX, `squint`, `smirk`, `isTalking` | zoom 1.22→1.0, panX −20→14, panY 336→300 |
+| 0–224 | `wide` | Char 1 + Char 2 на повний зріст, місто, сонце | zoom 1.02→1.12, плавний push-in, легкий handheld |
+| 225–449 | `medium` | діалог двох персонажів по пояс/до колін | zoom 1.25→1.35, `pan`, злегка розмитий далекий план |
+| 450–674 | `closeup` | обличчя Char 1 + підпис на 48% | zoom 1.5→1.65, автоматичний `panY`-підйом, DOF 2.5 px |
+| 675–899 | `extreme-closeup` | очі на весь кадр | zoom 2.1→2.4, імпульс входу 7 кадрів, вібрація, grain |
+| 900–1124 | `top-down` | маківки героїв, мангал/знак/дерево зверху | plate + орбітальний `pan`, roll ±1.8° |
+| 1125–1349 | `pov` | вулиця від першої особи + плечі глядача | handheld 7 px, walk-cycle 1.85 Hz, POV-віньєтка |
+| 1350–1574 | `object-focus` | дорожній знак, ретикул, боке | zoom 1.7→1.95, CSS blur 7 px на далеких шарах |
+| 1575–1799 | `map` | тактична карта: маршрути, цілі, HUD | `static` + scanline, маркери й підписи |
 
-Порядок малювання в `World`: **Sky → Horizon → Ground → Midground → dust band (depth .92) → actors (depth 1) → Embers → Atmosphere → audio → text**. Підлога (`Ground`) навмисно під пропсами (`Midground`), інакше поверхня землі ховає декорації на середньому плані.
+Порядок малювання в `World`: **Sky+Horizon (far plane, `backgroundBlur`) → Ground (`0.45 × blur`) → Midground → dust band (depth .92) → actors (depth 1) → Embers → Atmosphere → audio → text**. Підлога (`Ground`) навмисно під пропсами (`Midground`), інакше поверхня землі ховає декорації на середньому плані.
 
 ### 2.3 `Camera.tsx`
 
 ```ts
-type Camera = { zoom: number; panX: number; panY: number; shakeX: number; shakeY: number };
+type Camera = {
+  zoom: number;
+  panX: number;
+  panY: number;
+  shakeX: number;
+  shakeY: number;
+  roll?: number;        // Dutch angle, deg (per depth)
+  tiltX?: number;       // high-angle 2.5D projection, deg
+  perspective?: number; // perspective distance for tiltX, px
+};
 ```
 
-`<Layer camera depth style?>` застосовує:
+`roll`, `tiltX` та `perspective` **опційні**: старі шоти, де камера створюється як `{ zoom, panX, panY, shakeX, shakeY }`, працюють без змін. `Layer` застосовує:
 
 ```ts
 scale = 1 + (camera.zoom - 1) * depth;
 tx = -camera.panX * depth + camera.shakeX * depth;
 ty = -camera.panY * depth + camera.shakeY * depth;
+transform = perspective(p) translate3d(tx,ty,0) rotateX(tiltX·min(1,depth)) rotate(roll·depth) scale(s)
 ```
 
 - `depth 0` — нескінченно далеко; `depth 1` — площина акторів; `>1` — передній план.
 - Рекомендовані `depth`: Sky `0.18`, Horizon `0.45`, Midground `0.78`, dust band `0.92`, Ground/actors `1`, Embers `1.18`.
+- `cameraTransform(camera, depth)` — чистий хелпер, який повертає CSS-рядок для власних шарів.
+- `makeCamera(partial)` / `mixCamera(a, b, t)` — безпечні дефолти та блендинг камер.
+- `lerp`, `clamp01`, `smoothstep`, `dampedWave(frame, amp, decay, speed)` — для власних анімацій.
 - `rand(seed, i)` — детермінований [0,1), щоб рендери були байт-у-байт стабільні. Не замінюй на `Math.random()`.
 - `clamp(v, min, max)`.
 - `STATIC_CAMERA` — нульова камера для тестів.
@@ -172,7 +203,7 @@ ty = -camera.panY * depth + camera.shakeY * depth;
 2. `Ground` простягається до `HEIGHT + 620` (і ширше за `WIDTH` на `[-100, WIDTH + 100]`);
 3. для крупних планів використовується підняття `panY` ≈ 300–396.
 
-Якщо збільшуєш `panX/panY` або опускаєш `zoom` — обов'язково перевір кадри на щілини по краях і знизу.
+`CinematicShot` сам клампить `panX/panY` до bleed-запасу шару: `maxPan = (zoom − 1) × size/2 × 0.94`. Якщо збільшуєш `panX/panY` або опускаєш `zoom` — обов'язково перевір кадри на щілини по краях і знизу.
 
 ### 2.4 `Character.tsx` — точні пропи
 
@@ -350,6 +381,171 @@ export const LOCATIONS = {
 6. **Підключи локацію в `src/MainScene.tsx`** (передай `location="<name>"` у `<MainScene>`, у `Root.tsx`, або у конкретний `<World camera={camera} location="<name>">`).
 7. **Перевір результат:** запусти `npm run lint` та зроби `npx remotion still src/index.ts Popsikos2DAnimations out/check.png --frame=...` на широкому і крупному плані, щоб упевнитися, що немає щілин по краях, SVG `id` не перетинаються і текст читається на фоні.
 
+### 2.9 Cinematic Shot Engine (`src/ShotEngine.tsx`)
+
+Двигун шотів — це шар поверх `Camera`: він рахує камеру, паралакс, handheld, ефекти й композицію для 8 кінематографічних планів. Імпорт:
+
+```ts
+import {
+  CinematicShot,   // компонент-обгортка
+  SHOT_PRESETS,   // Record<ShotType, ShotPreset>
+  SHOT_TYPES,     // масив усіх 8 типів у порядку демо
+  computeShot,    // чистий солвер (можна тестувати без React)
+  TopDownPlate,   // plate для top-down
+  TacticalMap,    // інфографічна карта для map
+} from "./ShotEngine";
+```
+
+#### Вісім типів шотів
+
+| `type` | Назва | Базовий zoom | Композиція | Паралакс / рух за замовч. |
+|---|---|---|---|---|
+| `wide` | Загальний план | 1.02–1.12 | повний зріст персонажів + середовище, багато неба | `parallax 1.0`, повільний `push-in`, handheld 1.1 px |
+| `medium` | Середній план | 1.25–1.35 | два персонажі по пояс/до колін, діалог | `parallax 0.85`, `pan`, легкий DOF 1.2 px |
+| `closeup` | Крупний план | 1.5–1.65 | обличчя + плечі, **авто-підйом `panY`** (focusLine 0.27 + `lift 90`), щоб підпис 48% був під ротом | `parallax 0.6`, `push-in`, DOF 2.5 px |
+| `extreme-closeup` | Екстремальний наїзд | 2.1–2.4 | очі/обличчя на весь кадр | імпульс входу 7 кадрів, вібрація ~0.5 px, grain, flash |
+| `top-down` | Вид зверху | 1.14–1.26 | окрема plate-проекція: маківки героїв, тіні, дерево/знак/люк на поверхні | `parallax 1.25`, орбітальний `pan`, roll ±1.8° |
+| `pov` | Від першої особи | 1.16–1.26 | вулиця з очей героя, плечі глядача внизу | handheld 7 px, walk-cycle 1.85 Hz, м'яка віньєтка |
+| `object-focus` | Акцент на предметі | 1.7–1.95 | об'єкт у центрі + ретикул, задні шари розмиті | `parallax 0.7`, CSS blur 7 px → `World backgroundBlur` |
+| `map` | Тактична карта | 1.0–1.05 | 2D-схема: сітка, блоки, анімовані маршрути, маркери, HUD | `parallax 0.6`, `static`, scanline |
+
+#### `<CinematicShot>` — повний API
+
+```tsx
+<CinematicShot
+  type="closeup"                       // обов'язково
+  durationInFrames={225}               // обов'язково, довжина <Sequence>
+  target={{ x: 540, y: 986 }}          // точка фокусу в координатах кадру
+  location="street"                    // LocationId для HUD/plate
+  shake={1}                            // 0 = locked, 1 = пресет, >1 = сильніше
+  motion="push-in"                     // "push-in" | "pull-out" | "pan" | "static"
+  label                                // true = авто-HUD, рядок = власний текст
+>
+  {({ camera, fx, frame, progress, preset, target, motion }) => (
+    <World camera={camera} backgroundBlur={fx.focusBlur}>
+      <Character x={540} y={1900} scale={2.05} />
+    </World>
+  )}
+</CinematicShot>
+```
+
+| Prop | Тип | За замовч. | Що робить |
+|---|---|---|---|
+| `type` | `ShotType` | — | один із 8 пресетів вище |
+| `durationInFrames` | `number` | — | довжина шоту; має збігатися з `<Sequence>` |
+| `target` | `{ x, y }` | `{540, 1190}` | точка, яку камера ставить на `focusLine` пресета |
+| `location` | `LocationId` | `DEFAULT_LOCATION` | для HUD-беджа та plate-компонентів |
+| `shake` | `number` | `1` | множник handheld/вібрації |
+| `motion` | `ShotMotion` | пресет | напрям руху камери |
+| `label` | `boolean \| string` | `false` | верхній лівий HUD: номер, тип, motion, локація, тривалість |
+| `children` | `ReactNode \| (state) => ReactNode` | — | сцена; функція отримує `camera`, `fx`, `frame`, `progress`, `preset` |
+
+#### `motion` — як рухається камера
+
+| `motion` | zoom | pan |
+|---|---|---|
+| `push-in` | `zoom[0] → zoom[1]` (ease in-out) | до `target` |
+| `pull-out` | `zoom[1] → zoom[0]` | до `target` |
+| `pan` | середній zoom + дихання | додає горизонтальний sweep ±7.5% ширини × `parallax` |
+| `static` | майже нерухомий + мікродрейф | до `target` |
+
+Солвер `computeShot` сам:
+1. ставить `target` на `focusLine` пресета;
+2. додає `lift` (headroom) і авто-підйом для `closeup`/`extreme-closeup`;
+3. клампить `panX/panY` до bleed-запасу шару, щоб не було щілин;
+4. додає детермінований handheld (`sin`/`cos`, без `Math.random()`);
+5. повертає `fx` з `focusBlur`, `vignette`, `pov`, `flash`, `grain`, `focusPoint`.
+
+#### Приклади
+
+**1. Крупний план з автоматичним headroom:**
+
+```tsx
+<Sequence from={450} durationInFrames={225} name="03 Close-up">
+  <CinematicShot
+    type="closeup"
+    durationInFrames={225}
+    target={{ x: 540, y: 986 }}
+    motion="push-in"
+    location="street"
+    label
+  >
+    {({ camera, fx }) => (
+      <World camera={camera} location="street" backgroundBlur={fx.focusBlur}>
+        <Character x={540} y={1900} scale={2.05} eyeType="wide" mouthType="sad" />
+      </World>
+    )}
+  </CinematicShot>
+</Sequence>
+```
+
+**2. Вид зверху (plate):**
+
+```tsx
+<CinematicShot type="top-down" durationInFrames={225} motion="pan">
+  {({ camera }) => (
+    <Layer camera={camera} depth={1}>
+      <TopDownPlate location="street" />
+    </Layer>
+  )}
+</CinematicShot>
+```
+
+**3. Тактична карта:**
+
+```tsx
+<CinematicShot type="map" durationInFrames={225} target={{ x: 742, y: 812 }}>
+  {({ camera }) => (
+    <Layer camera={camera} depth={0.45}>
+      <TacticalMap location="street" target={{ x: 742, y: 812 }} />
+    </Layer>
+  )}
+</CinematicShot>
+```
+
+**4. Предметний шот із DOF:**
+
+```tsx
+<CinematicShot
+  type="object-focus"
+  durationInFrames={225}
+  target={{ x: 568, y: 1349 }}
+  label="OBJECT · ROAD SIGN"
+>
+  {({ camera, fx }) => (
+    <World camera={camera} location="street" backgroundBlur={fx.focusBlur}>
+      <></>
+    </World>
+  )}
+</CinematicShot>
+```
+
+**5. Тест без React:**
+
+```ts
+import { computeShot } from "./ShotEngine";
+
+const { camera, fx } = computeShot({
+  type: "extreme-closeup",
+  durationInFrames: 225,
+  frame: 40,
+  target: { x: 540, y: 612 },
+  motion: "push-in",
+  shake: 1,
+});
+
+console.log(camera.zoom, camera.panY, fx.focusPoint);
+```
+
+#### Важливі нюанси
+
+- `target` живе в координатах **площини акторів** (`depth 1`). Якщо фокус на глибшому шарі (знак у `Midground`, depth `0.78`), зсувай `target` так, щоб розв'язок для depth 1 збігся з реальною точкою (у демо: `{ x: 568, y: 1349 }` замість `{ x: 560, y: 1298 }`).
+- `fx.focusBlur` треба передати у `World backgroundBlur`; сам `CinematicShot` не знає, з яких шарів складається локація.
+- `top-down` і `map` — самодостатні plate-компоненти: вони рендеряться замість `World`, а `LocationId` лише підписує HUD.
+- `label` вмикай для демо/дебагу; у фінальному фільмі його зазвичай вимикають.
+- Усі ефекти детерміновані: `rand(seed, i)` + frame-based `sin`. `Math.random()` заборонений.
+- Нові пресети додавай у `SHOT_PRESETS` і `SHOT_TYPES`; `ShotType` виводиться з ключів `SHOT_PRESETS`, тому TS сам підкаже, де оновити демо.
+
 ---
 
 ## 3. Звук та озвучка
@@ -420,7 +616,7 @@ python build_dialogue.py
 
 Без явного прохання користувача **заборонено** видаляти, перейменовувати або переписувати з нуля:
 
-`src/MainScene.tsx`, `src/Character.tsx`, `src/Camera.tsx`, `src/TextOverlays.tsx`, `src/palette.ts`, `src/Root.tsx`, `src/index.ts`, `src/locations/types.ts`, `src/locations/street/*`, `generate_sfx.py`, `build_dialogue.py`, `SOUNDS.md`, `public/sfx/*`.
+`src/MainScene.tsx`, `src/Character.tsx`, `src/Camera.tsx`, `src/ShotEngine.tsx`, `src/TextOverlays.tsx`, `src/palette.ts`, `src/Root.tsx`, `src/index.ts`, `src/locations/types.ts`, `src/locations/street/*`, `generate_sfx.py`, `build_dialogue.py`, `SOUNDS.md`, `public/sfx/*`.
 
 - Змінюй **точково** (`edit`), зберігаючи публічні експорти та пропи.
 - Нові пропси — тільки опційні; не ламай зворотну сумісність.
@@ -459,6 +655,7 @@ python build_dialogue.py
 - Перемикати `location` у `MainScene.tsx`, `Root.tsx` або в окремих шотах (`<World location="...">`).
 - Тексти титрів, тайминги появ, гучності окремих звуків (з перевіркою кліпінгу).
 - Нові опційні пропси `Character`/`TextOverlays` з дефолтами.
+- Розширювати `SHOT_PRESETS`/`SHOT_TYPES` у `src/ShotEngine.tsx` новими планами та ефектами (зберігаючи 8 базових пресетів).
 - Додаткові звуки через `generate_sfx.py` + `SOUNDS.md`.
 - Косметику та нові кольори у `PALETTE` (`src/palette.ts`).
 
@@ -472,7 +669,11 @@ python build_dialogue.py
 | Кирилиця стала `РђРЇ` | PowerShell переписав UTF-8 як ANSI — віднови файл і редагуй у UTF-8 |
 | Смуга/щілина по краю кадру | камера вийшла за межі шару; перевір `overflow: visible`, запас `Ground` (`HEIGHT + 620`), `panY` |
 | Конфлікт градієнтів між локаціями | однакові `id` у SVG `<defs>` — давай унікальні префікси локації (`bunkerSkyGrad`) |
-| Підпис закриває рот | піднято `panY` крупного плану або зменш `top`/розмір підпису |
+| Підпис закриває рот | у `closeup`/`extreme-closeup` не опускай `panY` нижче авто-підйому; пресет сам ставить `focusLine 0.27`, перевір кадр на 48% |
+| Задній план не розмивається | передай `fx.focusBlur` у `<World backgroundBlur={fx.focusBlur}>`; `CinematicShot` не знає шарів локації |
+| Щілина в `top-down`/`map` | plate має bleed `-160..+160`, а `Layer` краще ставити з `depth 1` (top-down) або `0.45` (map); не збільшуй `shake` понад 1.5 |
+| Камера «стрибає» на карті | для `map` використовуй `motion="static"` і `shake ≤ 0.5`, інакше HUD-текст тремтить |
+| `target` не туди наводить | `target` — координати площини акторів (depth 1); для `Midground` (0.78) компенсуй зсув вручну |
 | Рот не рухається | не запущено `python build_dialogue.py` після зміни `public/voices/` або `isTalking` не збігається з Sequence |
 | Тиша в кінці | немає фонового беду після останнього SFX — перевір `<Loop>` на `wind_ambient.wav` |
 | Рендер без звуку | `<Audio>` поза композицією / `staticFile` на неіснуючий файл |
@@ -484,7 +685,13 @@ python build_dialogue.py
 ```bash
 npm run lint
 npx remotion still src/index.ts Popsikos2DAnimations out/check.png --frame=150
+# усі 8 шотів (wide, medium, closeup, extreme, top-down, pov, object-focus, map):
+npx remotion still src/index.ts Popsikos2DAnimations out/shot-1.png --frame=110
+npx remotion still src/index.ts Popsikos2DAnimations out/shot-3.png --frame=560
+npx remotion still src/index.ts Popsikos2DAnimations out/shot-8.png --frame=1685
 python generate_sfx.py
 python build_dialogue.py
 npx remotion render src/index.ts Popsikos2DAnimations out/episode.mp4 --codec=h264 --crf=18 --image-format=png --pixel-format=yuv420p
 ```
+
+**Швидкий старт зі шотами:** імпортуй `CinematicShot` та `SHOT_TYPES` з `src/ShotEngine.tsx`; кожен план — це `<Sequence from={start} durationInFrames={len}>` з `<CinematicShot type=... motion=... target=...>`, а `computeShot({ type, durationInFrames, frame, target, motion, shake })` дає ту саму камеру без React (для тестів/утиліт). Повний перелік типів і пропсів — розділ **2.9**.

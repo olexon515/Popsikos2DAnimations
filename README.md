@@ -6,8 +6,9 @@
 
 A pure 2D (SVG + React) vertical cartoon built with [Remotion](https://www.remotion.dev/):
 **1080×1920, 30 fps**, fully local procedural sound design, multi-voice dialogue with
-automatic lip-sync, comic-style Ukrainian typography — and a **modular location system**
-(`src/locations/`) so you can build new places with an AI agent.
+automatic lip-sync, comic-style Ukrainian typography — plus a **modular location system**
+(`src/locations/`) and a **Cinematic Shot Engine** with 8 ready-made shot types
+(`src/ShotEngine.tsx`), so you can build new places and new camera work with an AI agent.
 
 - [English](#english)
 - [Українською](#українською)
@@ -54,7 +55,8 @@ SOUNDS.md              sound catalogue: duration, loudness, mix timeline
 AGENTS.md              full agent handbook (environment, rules, checklists)
 src/
 ├─ Root.tsx            composition registration (1080x1920, 30 fps, DURATION)
-├─ MainScene.tsx      three shots, camera, grade, audio mix, text overlays
+├─ MainScene.tsx      eight shots, camera, grade, audio mix, text overlays
+├─ ShotEngine.tsx      8 cinematic shot types + plates/effects
 ├─ Character.tsx       SVG puppet: 4 eye types, 5 mouths, breathing, talking
 ├─ TextOverlays.tsx    HookTitle + DynamicCaption (spring, comic outline)
 ├─ Camera.tsx          parallax Layer, camera type, deterministic random
@@ -87,6 +89,51 @@ Pick it by name anywhere in the scene:
 
 The reference implementation lives in `src/locations/street/` and is documented
 step by step in [`AGENTS.md`](./AGENTS.md#28-модульна-система-локацій-srclocations-та-створення-нових-локацій).
+
+### Cinematic Shot Engine
+
+`src/ShotEngine.tsx` turns eight named shot types into a camera + effect state. Each
+shot is just a `<Sequence>` wrapping `<CinematicShot>`; the render prop gives you the
+solved camera, so the location layers stay exactly where they are.
+
+| `type` | Look | Zoom | Default motion / effects |
+|---|---|---|---|
+| `wide` | full-body characters, lots of sky | 1.02–1.12 | slow push-in, 1.1 px handheld |
+| `medium` | two-shot for dialogue | 1.25–1.35 | pan, light DOF |
+| `closeup` | face + shoulders, caption-safe headroom | 1.5–1.65 | push-in, auto `panY` lift, DOF 2.5 px |
+| `extreme-closeup` | eyes fill the frame | 2.1–2.4 | entry impulse, vibration, grain, flash |
+| `top-down` | top projection: head-tops and surface props | 1.14–1.26 | orbital pan, roll ±1.8° |
+| `pov` | first-person street view with shoulders | 1.16–1.26 | 7 px handheld, 1.85 Hz walk cycle, vignette |
+| `object-focus` | object dead centre with a reticle | 1.7–1.95 | push-in, back layers blurred |
+| `map` | 2D tactical map: routes, markers, HUD | 1.0–1.05 | static, scanline |
+
+```tsx
+import { CinematicShot } from "./ShotEngine";
+
+<Sequence from={450} durationInFrames={225} name="03 Close-up">
+  <CinematicShot
+    type="closeup"
+    durationInFrames={225}
+    target={{ x: 540, y: 986 }}   // actor-plane coordinates
+    motion="push-in"
+    location="street"
+    label                          // HUD badge, great for demos
+  >
+    {({ camera, fx }) => (
+      <World camera={camera} location="street" backgroundBlur={fx.focusBlur}>
+        <Character x={540} y={1900} scale={2.05} eyeType="wide" mouthType="sad" />
+      </World>
+    )}
+  </CinematicShot>
+</Sequence>
+```
+
+`target` is the point the camera puts on the preset's focus line; pass `fx.focusBlur`
+into `<World backgroundBlur>` to get the depth-of-field on the far layers. `top-down`
+and `map` ship their own plates (`TopDownPlate`, `TacticalMap`). Need the camera math
+without React? `computeShot({ type, durationInFrames, frame, target, motion, shake })`
+is a pure solver. Full API, presets and pitfalls: [`AGENTS.md` §2.9](./AGENTS.md#29-cinematic-shot-engine-srcshotenginetsx).
+
 
 ### Use it with OpenCode / Claude Code
 
@@ -149,6 +196,8 @@ What the agent does under the hood (defined in `AGENTS.md`):
   stroke + gradient fill, so Ukrainian glyphs render without network access.
 - Close-up shots are framed with headroom so the `DynamicCaption` at 48% never
   covers the character's mouth.
+- The demo timeline exercises all 8 shot types (`wide` → `map`); `CinematicShot`
+  keeps the camera deterministic and clamps pans to each layer's bleed margins.
 - Determinism matters: use `rand(seed, i)` from `src/Camera.tsx`, never `Math.random()`.
 
 ### Repository hygiene
@@ -208,7 +257,8 @@ SOUNDS.md              каталог звуків: тривалість, гуч
 AGENTS.md              повний довідник для агента (середовище, правила, чеклісти)
 src/
 ├─ Root.tsx            реєстрація композиції (1080x1920, 30 fps, DURATION)
-├─ MainScene.tsx      три шоти, камера, грейд, аудіомікс, титри
+├─ MainScene.tsx      вісім шотів, камера, грейд, аудіомікс, титри
+├─ ShotEngine.tsx      8 кінематографічних типів шотів + plate/ефекти
 ├─ Character.tsx       SVG-маріонетка: 4 типи очей, 5 ротів, дихання, мова
 ├─ TextOverlays.tsx    HookTitle + DynamicCaption (spring, comic-обводка)
 ├─ Camera.tsx          паралакс Layer, тип Camera, детермінований random
@@ -241,6 +291,51 @@ export const LOCATIONS = {
 
 Еталонна реалізація — `src/locations/street/`; покрокова інструкція для агента
 є в [`AGENTS.md`](./AGENTS.md#28-модульна-система-локацій-srclocations-та-створення-нових-локацій).
+
+### Cinematic Shot Engine
+
+`src/ShotEngine.tsx` перетворює вісім названих типів планів на стан камери й ефектів.
+Кожен шот — це `<Sequence>` з `<CinematicShot>`; render-prop віддає вже розв'язану
+камеру, тому шари локації лишаються на своїх місцях.
+
+| `type` | Вигляд | Zoom | Рух / ефекти за замовч. |
+|---|---|---|---|
+| `wide` | персонажі на повний зріст, багато неба | 1.02–1.12 | повільний push-in, handheld 1.1 px |
+| `medium` | двобійний план для діалогу | 1.25–1.35 | pan, легкий DOF |
+| `closeup` | обличчя + плечі, запас під підпис | 1.5–1.65 | push-in, авто-підйом `panY`, DOF 2.5 px |
+| `extreme-closeup` | очі на весь кадр | 2.1–2.4 | імпульс входу, вібрація, grain, flash |
+| `top-down` | проекція зверху: маківки й предмети на поверхні | 1.14–1.26 | орбітальний pan, roll ±1.8° |
+| `pov` | вулиця від першої особи з плечима | 1.16–1.26 | handheld 7 px, walk-cycle 1.85 Hz, віньєтка |
+| `object-focus` | предмет у центрі з ретикулом | 1.7–1.95 | push-in, задні шари розмиті |
+| `map` | 2D-тактична карта: маршрути, маркери, HUD | 1.0–1.05 | static, scanline |
+
+```tsx
+import { CinematicShot } from "./ShotEngine";
+
+<Sequence from={450} durationInFrames={225} name="03 Close-up">
+  <CinematicShot
+    type="closeup"
+    durationInFrames={225}
+    target={{ x: 540, y: 986 }}   // координати площини акторів
+    motion="push-in"
+    location="street"
+    label                          // HUD-бедж, зручно для демо
+  >
+    {({ camera, fx }) => (
+      <World camera={camera} location="street" backgroundBlur={fx.focusBlur}>
+        <Character x={540} y={1900} scale={2.05} eyeType="wide" mouthType="sad" />
+      </World>
+    )}
+  </CinematicShot>
+</Sequence>
+```
+
+`target` — точка, яку камера ставить на `focusLine` пресета; передай `fx.focusBlur`
+у `<World backgroundBlur>`, щоб далекий план розмився. `top-down` і `map` мають
+власні plate-компоненти (`TopDownPlate`, `TacticalMap`). Потрібна камера без React?
+`computeShot({ type, durationInFrames, frame, target, motion, shake })` — чистий
+солвер. Повний API, пресети й граблі: [`AGENTS.md` §2.9](./AGENTS.md#29-cinematic-shot-engine-srcshotenginetsx).
+
 
 ### Робота в OpenCode / Claude Code
 
@@ -303,6 +398,8 @@ export const LOCATIONS = {
   стекованою обводкою та градієнтом, тому українські гліфи рендеряться без мережі.
 - Крупні плани кадровані із запасом зверху, щоб `DynamicCaption` на 48% не
   закривав рот персонажа.
+- Демо-таймлайн проходить усі 8 типів планів (`wide` → `map`); `CinematicShot`
+  тримає камеру детермінованою й клампить pan до bleed-запасу кожного шару.
 - Детермінованість важлива: використовуй `rand(seed, i)` з `src/Camera.tsx`,
   а не `Math.random()`.
 
