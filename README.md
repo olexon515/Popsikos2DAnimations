@@ -1,5 +1,7 @@
 # Popsikos2DAnimations — vertical 2D animation studio
 
+![Popsikos2DAnimations demo](public/demo.gif)
+
 [![Made with Remotion](https://img.shields.io/badge/made%20with-Remotion-0B84F3)](https://www.remotion.dev/)
 
 A pure 2D (SVG + React) vertical cartoon built with [Remotion](https://www.remotion.dev/):
