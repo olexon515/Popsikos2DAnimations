@@ -36,10 +36,13 @@ npm run lint
 # 4. regenerate the six base WAVs (numpy + ffmpeg, no network)
 python generate_sfx.py
 
-# 5. (optional) rebuild the dialogue timeline + lip-sync from public/voices/
+# 5. (optional) automatic voice-over with ElevenLabs (needs .env), also rebuilds the timeline
+python generate_voices.py
+
+# 6. (optional) rebuild the dialogue timeline + lip-sync from public/voices/
 python build_dialogue.py
 
-# 6. render the film with sound and captions
+# 7. render the film with sound and captions
 npx remotion render src/index.ts Popsikos2DAnimations out/episode.mp4 \
   --codec=h264 --crf=18 --image-format=png --pixel-format=yuv420p
 ```
@@ -51,6 +54,9 @@ command on a single line.
 
 ```
 generate_sfx.py        procedural sound synthesis  -> public/sfx/*.wav
+generate_voices.py     ElevenLabs TTS (eleven_flash_v2_5) -> public/voices/*.mp3
+script_voices.json     voice-over script: file / speaker / text
+voices_config.example.json  public Rachel/Adam/Bella/Antoni voice IDs
 build_dialogue.py      dialogue timing + lip-sync    -> src/dialogueTimeline.ts
 SOUNDS.md              sound catalogue: duration, loudness, mix timeline
 AGENTS.md              full agent handbook (environment, rules, checklists)
@@ -193,6 +199,61 @@ and place it in the scene:
 
 Full step-by-step recipe: [`AGENTS.md` §2.11](./AGENTS.md#211-модульний-реєстр-персонажів-srccharacters).
 
+### Automatic voice-over with ElevenLabs
+
+`generate_voices.py` turns a plain text script into the dialogue track — no extra Python
+packages, just `urllib.request` from the standard library.
+
+```bash
+# 1. create your local .env from the committed template
+Copy-Item .env.example .env          # macOS/Linux: cp .env.example .env
+
+# 2. add the key (https://elevenlabs.io/app/settings/api-keys)
+#    ELEVENLABS_API_KEY=your_key
+
+# 3. generate public/voices/*.mp3 and rebuild src/dialogueTimeline.ts
+python generate_voices.py
+```
+
+The script uses **`eleven_flash_v2_5`** (fast, multilingual — Ukrainian and English both
+work), reads lines from `script_voices.json`, takes voice IDs from `voices_config.json`
+and then runs `build_dialogue.py`, so pauses and lip-sync are updated in one go.
+
+```json
+// script_voices.json
+[
+  { "file": "01_narrator.mp3", "speaker": "narrator", "text": "День перший..." },
+  { "file": "02_char1.mp3",    "speaker": "char1",    "text": "Це не захід сонця..." }
+]
+```
+
+`voices_config.example.json` ships public ElevenLabs voices for the roles `narrator`
+(Rachel), `alex` (Adam), `maya` (Bella), `viktor` (Antoni), `default`, plus `char1` /
+`char2` demo slots used by `MainScene.tsx`. If your local `voices_config.json` is missing,
+the script falls back to the example automatically. Copy the example to
+`voices_config.json` to customise voices, stability or cloned voice IDs.
+
+| File | In Git | Purpose |
+|---|---|---|
+| `.env.example` | yes | template with `ELEVENLABS_API_KEY=your_elevenlabs_api_key_here` |
+| `.env` | **no** | your real key, created locally |
+| `voices_config.example.json` | yes | default public voice IDs |
+| `voices_config.json` | **no** | your local voice IDs / settings |
+| `script_voices.json` | yes | the lines to speak |
+| `public/voices/` | **no** | generated or manually recorded audio |
+
+No key? The script prints a bilingual hint and, if `public/voices/` already has files,
+simply rebuilds the timeline. You can always drop your own `01_narrator.mp3`,
+`02_char1.mp3`, … into `public/voices/` and run `python build_dialogue.py`.
+
+**Key safety:** `.env` and `voices_config.json` are gitignored. Never commit, print or
+paste a real key into the repo — commit only the `.example` files. If a key ever leaks,
+revoke it in the ElevenLabs dashboard immediately, then clean the git history.
+
+Flags: `--force` (regenerate existing mp3s; a same-number `.wav` is renamed to `.bak`
+instead of duplicating the line), `--skip-build`, `--dry-run`, `--help`.
+Full reference: [`AGENTS.md` §3.5](./AGENTS.md#35-авто-озвучка-через-elevenlabs-generate_voicespy).
+
 
 ### Use it with OpenCode / Claude Code
 
@@ -244,7 +305,7 @@ What the agent does under the hood (defined in `AGENTS.md`):
 | New character | `src/characters/<role>_<name>.ts` → registered in `src/characters/index.ts` |
 | New location | `src/locations/<name>/` → registered in `src/locations/index.ts` |
 | New sound | function + `library` entry in `generate_sfx.py` → `python generate_sfx.py` → row in `SOUNDS.md` |
-| New dialogue | `public/voices/NN_speaker.wav` → `python build_dialogue.py` |
+| New dialogue | `script_voices.json` → `python generate_voices.py` (ElevenLabs) or drop `public/voices/NN_speaker.mp3` → `python build_dialogue.py` |
 | Scene + captions | `src/MainScene.tsx` (`location=`, `HookTitle`, `DynamicCaption`, `<Audio>`) |
 | Verification | `npm run lint` → `npx remotion still …` → `npx remotion render …` |
 
@@ -255,6 +316,8 @@ What the agent does under the hood (defined in `AGENTS.md`):
   deterministic (`rand(seed, i)` + frame-based `sin`), and mouths follow real voice amplitude.
 - Heroes are modular presets (`src/characters/`); a new look never requires a new rig.
 - Sound is synthesised from noise and oscillators, then cleaned and limited with ffmpeg.
+- Voice-over is generated by `generate_voices.py` (ElevenLabs, stdlib only); the API key
+  lives in a gitignored `.env`, never in the repo.
 - Text uses local heavy fonts (Arial Black / Segoe UI Black / Impact) with a layered
   stroke + gradient fill, so Ukrainian glyphs render without network access.
 - Close-up shots are framed with headroom so the `DynamicCaption` at 48% never
@@ -268,11 +331,14 @@ What the agent does under the hood (defined in `AGENTS.md`):
 `.gitignore` keeps generated and personal files out of Git:
 
 ```
-node_modules/  out/  dist/  .env  .env.local
+node_modules/  out/  dist/  .env  .env.local  .env.*.local
+voices_config.json
 public/voices/  public/voice.mp3
 Thumbs.db  __pycache__/  *.py[cod]
 ```
 
+Only the `.example` files (`.env.example`, `voices_config.example.json`) and
+`script_voices.json` are committed — the API key and generated audio never are.
 The base sound library `public/sfx/*.wav` **is** committed, so a fresh clone can
 render immediately.
 
@@ -300,10 +366,13 @@ npm run lint
 # 4. перегенерувати шість базових WAV (numpy + ffmpeg, без інтернету)
 python generate_sfx.py
 
-# 5. (опційно) перебудувати таймлайн діалогів і lip-sync із public/voices/
+# 5. (опційно) авто-озвучка через ElevenLabs (потрібен .env), одразу перебудовує таймлайн
+python generate_voices.py
+
+# 6. (опційно) перебудувати таймлайн діалогів і lip-sync із public/voices/
 python build_dialogue.py
 
-# 6. фінальний рендер зі звуком і титрами
+# 7. фінальний рендер зі звуком і титрами
 npx remotion render src/index.ts Popsikos2DAnimations out/episode.mp4 \
   --codec=h264 --crf=18 --image-format=png --pixel-format=yuv420p
 ```
@@ -315,6 +384,9 @@ npx remotion render src/index.ts Popsikos2DAnimations out/episode.mp4 \
 
 ```
 generate_sfx.py        процедурний синтез звуку   -> public/sfx/*.wav
+generate_voices.py     ElevenLabs TTS (eleven_flash_v2_5) -> public/voices/*.mp3
+script_voices.json     сценарій озвучки: file / speaker / text
+voices_config.example.json  публічні голоси Rachel/Adam/Bella/Antoni
 build_dialogue.py      таймлайн діалогів + lip-sync -> src/dialogueTimeline.ts
 SOUNDS.md              каталог звуків: тривалість, гучність, мапа міксу
 AGENTS.md              повний довідник для агента (середовище, правила, чеклісти)
@@ -457,6 +529,63 @@ export const CHARACTERS = {
 
 Покроковий рецепт: [`AGENTS.md` §2.11](./AGENTS.md#211-модульний-реєстр-персонажів-srccharacters).
 
+### Авто-озвучка через ElevenLabs
+
+`generate_voices.py` перетворює звичайний текстовий сценарій на готову дорожку діалогів —
+без сторонніх Python-пакетів, лише `urllib.request` зі стандартної бібліотеки.
+
+```bash
+# 1. створити локальний .env із шаблону
+Copy-Item .env.example .env          # macOS/Linux: cp .env.example .env
+
+# 2. вписати ключ (https://elevenlabs.io/app/settings/api-keys)
+#    ELEVENLABS_API_KEY=твій_ключ
+
+# 3. згенерувати public/voices/*.mp3 і перебудувати src/dialogueTimeline.ts
+python generate_voices.py
+```
+
+Скрипт використовує **`eleven_flash_v2_5`** (швидка багатомовна модель — українська
+й англійська працюють), читає репліки з `script_voices.json`, бере голоси з
+`voices_config.json` і одразу запускає `build_dialogue.py`, тому паузи та lip-sync
+оновлюються за один запуск.
+
+```json
+// script_voices.json
+[
+  { "file": "01_narrator.mp3", "speaker": "narrator", "text": "День перший..." },
+  { "file": "02_char1.mp3",    "speaker": "char1",    "text": "Це не захід сонця..." }
+]
+```
+
+`voices_config.example.json` містить стандартні публічні голоси ElevenLabs для ролей
+`narrator` (Rachel), `alex` (Adam), `maya` (Bella), `viktor` (Antoni), `default`,
+а також демо-слоти `char1` / `char2`, які використовує `MainScene.tsx`. Якщо локального
+`voices_config.json` немає, скрипт автоматично бере `.example`. Скопіюй приклад у
+`voices_config.json`, щоб змінити голоси, стабільність або ID клонованого голосу.
+
+| Файл | У Git | Призначення |
+|---|---|---|
+| `.env.example` | так | шаблон `ELEVENLABS_API_KEY=your_elevenlabs_api_key_here` |
+| `.env` | **ні** | реальний ключ, створюється локально |
+| `voices_config.example.json` | так | стандартні публічні Voice ID |
+| `voices_config.json` | **ні** | локальні голоси й налаштування |
+| `script_voices.json` | так | репліки для озвучки |
+| `public/voices/` | **ні** | згенероване або записане вручну аудіо |
+
+Немає ключа? Скрипт друкує двомовну підказку, а якщо `public/voices/` уже має файли —
+просто перебудовує таймлайн. Ручний режим завжди доступний: поклади `01_narrator.mp3`,
+`02_char1.mp3`, … у `public/voices/` і запусти `python build_dialogue.py`.
+
+**Безпека ключа:** `.env` і `voices_config.json` у `.gitignore`. Ніколи не коміть,
+не друкуй і не вставляй реальний ключ у репозиторій — у Git ідуть лише `.example`-файли.
+Якщо ключ випадково потрапив у Git, негайно відклич його в ElevenLabs dashboard і
+вичисти історію.
+
+Прапорці: `--force` (перегенерувати наявні mp3; старий `.wav` з тим самим номером
+перейменовується в `.bak`, а не дублює репліку), `--skip-build`, `--dry-run`, `--help`.
+Повний довідник: [`AGENTS.md` §3.5](./AGENTS.md#35-авто-озвучка-через-elevenlabs-generate_voicespy).
+
 
 ### Робота в OpenCode / Claude Code
 
@@ -508,7 +637,7 @@ export const CHARACTERS = {
 | Новий герой | `src/characters/<role>_<name>.ts` → реєстрація в `src/characters/index.ts` |
 | Нова локація | `src/locations/<name>/` → реєстрація в `src/locations/index.ts` |
 | Новий звук | функція + запис у `library` в `generate_sfx.py` → `python generate_sfx.py` → рядок у `SOUNDS.md` |
-| Нова озвучка | `public/voices/NN_speaker.wav` → `python build_dialogue.py` |
+| Нова озвучка | `script_voices.json` → `python generate_voices.py` (ElevenLabs) або поклади `public/voices/NN_speaker.mp3` → `python build_dialogue.py` |
 | Сцена й титри | `src/MainScene.tsx` (`location=`, `HookTitle`, `DynamicCaption`, `<Audio>`) |
 | Перевірка | `npm run lint` → `npx remotion still …` → `npx remotion render …` |
 
@@ -519,6 +648,8 @@ export const CHARACTERS = {
   (`rand(seed, i)` + `sin` від кадру), а рот слідує за реальною амплітудою голосу.
 - Герої — модульні пресети (`src/characters/`); новий вигляд не потребує нового рига.
 - Звук синтезований із шуму й осциляторів, потім очищений і обмежений через ffmpeg.
+- Озвучку генерує `generate_voices.py` (ElevenLabs, лише stdlib); ключ API живе в
+  gitignored `.env` і ніколи не потрапляє в репозиторій.
 - Титри — локальні важкі шрифти (Arial Black / Segoe UI Black / Impact) зі
   стекованою обводкою та градієнтом, тому українські гліфи рендеряться без мережі.
 - Крупні плани кадровані із запасом зверху, щоб `DynamicCaption` на 48% не
@@ -533,12 +664,14 @@ export const CHARACTERS = {
 `.gitignore` тримає поза Git згенеровані та персональні файли:
 
 ```
-node_modules/  out/  dist/  .env  .env.local
+node_modules/  out/  dist/  .env  .env.local  .env.*.local
+voices_config.json
 public/voices/  public/voice.mp3
 Thumbs.db  __pycache__/  *.py[cod]
 ```
 
-Базова бібліотека `public/sfx/*.wav` **комітиться**, тому свіжий клон одразу
-готовий до рендера.
+У Git ідуть лише `.example`-файли (`.env.example`, `voices_config.example.json`) і
+`script_voices.json` — ключ API та згенероване аудіо ніколи. Базова бібліотека
+`public/sfx/*.wav` **комітиться**, тому свіжий клон одразу готовий до рендера.
 
 Документація Remotion: [the fundamentals](https://www.remotion.dev/docs/the-fundamentals).

@@ -1,14 +1,14 @@
 # AGENTS.md — Popsikos2DAnimations
 
 > Інструкція для AI-агентів (OpenCode, Claude Code тощо), які змінюють, розширюють або рендерять цей проєкт.
-> **Оновлено:** 2026-11-18 · **Корінь:** `./` (корінь репозиторію)
+> **Оновлено:** 2026-11-19 · **Корінь:** `./` (корінь репозиторію)
 > Дзеркало для Claude Skills (за наявності): `~/.claude/skills/popsikos-2d-animations/SKILL.md`
 
 ---
 
 ## 0. Що це і як почати за 5 хвилин
 
-**Popsikos2DAnimations** — вертикальні 2D-мультфільми на тему апокаліпсису: **1080×1920, 30 fps**, уся графіка — SVG + React, без 3D і без растрових ассетів. Декорації винесені в модульні локації (`src/locations/`), звук синтезований локально (`generate_sfx.py`), діалоги та lip-sync генеруються з `public/voices/` (`build_dialogue.py`), титри — CSS-текст із comic-обводкою, а 8 кінематографічних планів (wide → map) дає `src/ShotEngine.tsx`. Акторська гра (5 поз рук, постава, погляд, авто-моргання, кивки, `voiceAmplitude`) живе в `src/Character.tsx`, а готові герої — модульні пресети в `src/characters/`.
+**Popsikos2DAnimations** — вертикальні 2D-мультфільми на тему апокаліпсису: **1080×1920, 30 fps**, уся графіка — SVG + React, без 3D і без растрових ассетів. Декорації винесені в модульні локації (`src/locations/`), звук синтезований локально (`generate_sfx.py`), озвучку реплік можна згенерувати через ElevenLabs (`generate_voices.py` → `public/voices/*.mp3`), а діалоги та lip-sync — з `public/voices/` (`build_dialogue.py`), титри — CSS-текст із comic-обводкою, а 8 кінематографічних планів (wide → map) дає `src/ShotEngine.tsx`. Акторська гра (5 поз рук, постава, погляд, авто-моргання, кивки, `voiceAmplitude`) живе в `src/Character.tsx`, а готові герої — модульні пресети в `src/characters/`.
 
 | Параметр | Значення |
 |---|---|
@@ -40,6 +40,7 @@ npm run lint
 | Node.js / npm / npx | `^20.19.0 \|\| ^22.13.0 \|\| >=24` (має бути в `PATH`) |
 | Python | `python` (3.10+) + `numpy` |
 | ffmpeg / ffprobe | у `PATH` (потрібні для `generate_sfx.py`, `build_dialogue.py` та перевірки відео) |
+| ElevenLabs API (опційно) | ключ `ELEVENLABS_API_KEY` у локальному `.env` — лише для `generate_voices.py`; без ключа проєкт рендериться з готовими файлами в `public/voices/` або без озвучки |
 | Git | для контролю змін |
 
 > **Примітка для Windows PowerShell:** якщо `node`/`npm` не в `PATH`, додай шлях до Node.js у поточну сесію (наприклад, `$env:PATH="C:\Program Files\nodejs;$env:PATH"`). Якщо `npm.ps1` блокується Execution Policy, викликай `npm.cmd` та `npx.cmd` явно.
@@ -145,10 +146,14 @@ ffmpeg -v info -ss 9 -t 1 -i out/episode.mp4 -vn -af volumedetect -f null NUL 2>
 | `src/locations/index.ts` | реєстр локацій `LOCATIONS`, тип `LocationId`, `DEFAULT_LOCATION`, `getLocation()` |
 | `src/locations/street/` | еталонна локація `"street"`: `Sky.tsx`, `Horizon.tsx`, `Midground.tsx`, `Ground.tsx`, `Embers.tsx`, `index.ts` |
 | `generate_sfx.py` | numpy + ffmpeg генерація `public/sfx/*.wav` |
+| `generate_voices.py` | ElevenLabs TTS (`eleven_flash_v2_5`, stdlib `urllib`): `script_voices.json` + `voices_config.json` → `public/voices/*.mp3` → одразу `build_dialogue.py` |
+| `script_voices.json` | сценарій озвучки: масив `{"file", "speaker", "text"}` (комітиться, без секретів) |
+| `voices_config.example.json` | шаблон Voice ID для `narrator`/`alex`/`maya`/`viktor`/`default` + демо-слотів `char1`/`char2` (комітиться) |
+| `.env.example` | шаблон `ELEVENLABS_API_KEY` (комітиться); реальний `.env` — gitignored |
 | `build_dialogue.py` | сканує `public/voices/` і генерує `src/dialogueTimeline.ts` |
 | `SOUNDS.md` | каталог звуків: тривалість, гучність, мапа міксу |
 | `public/sfx/` | 6 базових WAV-файлів (44100 Hz, stereo, 16-bit PCM) |
-| `public/voices/` | озвучка реплік користувача (gitignored) |
+| `public/voices/` | озвучка реплік: готові файли або результат `generate_voices.py` (gitignored) |
 | `out/` | рендери (gitignored) |
 
 ### 2.2 Композиція та таймлайн
@@ -835,6 +840,154 @@ python build_dialogue.py
 - не вмикай `isTalking` на тихих хвостах реверберації;
 - перевіряй очима кадри на початку/всередині/в кінці фрази (`npx remotion still`), а не лише на слух.
 
+### 3.5 Авто-озвучка через ElevenLabs (`generate_voices.py`)
+
+Репліки можна озвучити автоматично: скрипт на стандартній бібліотеці Python
+(`urllib.request`, без `requests` і SDK) читає текст із `script_voices.json`, бере
+голоси з `voices_config.json`, викликає ElevenLabs із моделлю **`eleven_flash_v2_5`**
+(швидка багатомовна) і складає `.mp3` у `public/voices/`. Одразу після цього він
+запускає `build_dialogue.py`, тому паузи, `DIALOGUE`, `ENVELOPES` і lip-sync
+перераховуються автоматично.
+
+```
+script_voices.json ──┐
+voices_config.json ──┼──> generate_voices.py ──> public/voices/NN_speaker.mp3 ──> build_dialogue.py
+.env (ключ) ─────────┘
+```
+
+#### Файли
+
+| Файл | У Git | Призначення |
+|---|---|---|
+| `.env.example` | так | шаблон із `ELEVENLABS_API_KEY=your_elevenlabs_api_key_here` |
+| `.env` | **ні** (gitignored) | реальний ключ; створюється користувачем локально |
+| `voices_config.example.json` | так | публічні Voice ID за замовчуванням — працює «із коробки» |
+| `voices_config.json` | **ні** (gitignored) | локальні/власні Voice ID; якщо файлу немає, скрипт бере `.example` |
+| `script_voices.json` | так | сценарій озвучки: `[{"file", "speaker", "text"}]` |
+| `public/voices/` | **ні** (gitignored) | згенеровані `.mp3` (або покладені вручну файли) |
+
+#### Налаштування за 3 кроки
+
+```bash
+# 1. створити локальний .env із шаблону
+Copy-Item .env.example .env        # macOS/Linux: cp .env.example .env
+
+# 2. вписати ключ у .env (ключ: https://elevenlabs.io/app/settings/api-keys)
+#    ELEVENLABS_API_KEY=твій_ключ
+
+# 3. згенерувати озвучку + таймлайн
+python generate_voices.py
+```
+
+Ключ також можна передати змінною середовища (`$env:ELEVENLABS_API_KEY="..."` у
+PowerShell, `export ELEVENLABS_API_KEY=...` у bash) — вона має пріоритет над `.env`.
+Значення-заглушки (`your_elevenlabs_api_key_here`, `ВСТАВ_СЮДИ_СВІЙ_КЛЮЧ`, `change_me`)
+вважаються відсутнім ключем.
+
+**Без ключа** скрипт друкує двомовну підказку (як зробити `.env` або покласти `.mp3`
+вручну). Якщо `public/voices/` уже містить аудіо, він одразу перебудовує таймлайн;
+якщо ні — завершується з кодом `2`. Ручний режим лишається повністю робочим:
+
+```bash
+# поклади 01_narrator.mp3, 02_char1.mp3, 03_char2.mp3, ... у public/voices/
+python build_dialogue.py
+```
+
+#### `script_voices.json`
+
+```json
+[
+  {
+    "file": "01_narrator.mp3",
+    "speaker": "narrator",
+    "text": "День перший. Небо почервоніло, і місто замовкло."
+  },
+  {
+    "file": "02_char1.mp3",
+    "speaker": "char1",
+    "text": "Це не захід сонця. Це щось інше."
+  }
+]
+```
+
+- `file` — просте ім'я `.mp3`/`.wav` без шляхів, формат `<NN>_<speaker>` — саме так
+  `build_dialogue.py` сортує репліки та визначає спікера.
+- `speaker` — ключ у `voices_config.json`. Для демо-сцени використовуй `char1`/`char2`
+  (і `narrator`), бо `MainScene.tsx` викликає `isSpeaking("char1" | "char2" | "narrator")`.
+  Якщо перейменуєш файли на `alex`/`maya`, онови й ці виклики — інакше рот не рухатиметься.
+- `text` — репліка будь-якою мовою, яку підтримує `eleven_flash_v2_5` (українська, англійська тощо).
+- Репліки виконуються послідовно з паузою `0.25 s`; порядок у масиві = порядок у відео.
+
+#### `voices_config.json`
+
+```json
+{
+  "model": "eleven_flash_v2_5",
+  "output_format": "mp3_44100_128",
+  "default_settings": {
+    "stability": 0.45,
+    "similarity_boost": 0.75,
+    "style": 0.15,
+    "use_speaker_boost": true
+  },
+  "voices": {
+    "narrator": {
+      "name": "Rachel",
+      "voice_id": "21m00Tcm4TlvDq8ikWAM",
+      "settings": { "stability": 0.55 }
+    },
+    "default": { "voice_id": "21m00Tcm4TlvDq8ikWAM" }
+  }
+}
+```
+
+- `voices.<speaker>.voice_id` — обов'язковий; `settings` мерджаться поверх `default_settings`.
+- Невідомий спікер → `voices.default`. Немає ні його, ні `default` → репліка пропускається з попередженням.
+- У шаблоні — стандартні публічні голоси: **Rachel** `21m00Tcm4TlvDq8ikWAM`,
+  **Adam** `pNInz6obpgDQGcFmaJgB`, **Bella** `EXAVITQu4vr4xnSDxMaL`,
+  **Antoni** `ErXwobaYiN019PkySvjV`. Ролі: `narrator` → Rachel, `alex` → Adam,
+  `maya` → Bella, `viktor` → Antoni, `default` → Rachel; `char1`/`char2` — демо-слоти
+  (`MainScene.tsx`), вони вказують на Adam/Bella.
+- Щоб підставити власний або клонований голос, достатньо замінити `voice_id` у
+  локальному `voices_config.json` (файл gitignored).
+- `model` та `output_format` змінюються без правок коду (`eleven_flash_v2_5`,
+  `eleven_multilingual_v2`, `mp3_44100_192` тощо).
+
+#### Прапорці
+
+| Прапорець | Дія |
+|---|---|
+| `--force` | перегенерувати наявні файли (без нього існуючі `.mp3` пропускаються — економить кредити); старі файли з тим самим `<NN>_<speaker>`, але іншим розширенням (напр. `.wav`), перейменовуються в `.bak`, щоб `build_dialogue.py` не дублював репліку |
+| `--skip-build` | не запускати `build_dialogue.py` після генерації |
+| `--dry-run` | показати, які запити були б зроблені, без мережі й без запису файлів |
+| `--help` | повна довідка |
+
+#### Безпека ключа (обов'язково)
+
+1. `.env` і `voices_config.json` — у `.gitignore`; у Git ідуть лише `.env.example` та
+   `voices_config.example.json`. Не додавай `.env` через `git add -f`.
+2. Ніколи не друкуй ключ у чат, логи, commit message, скріншоти, `.tsx` або документацію.
+3. Перед кожним commit перевіряй `git status --short` і `git diff --cached`: у diff не
+   має бути рядка `ELEVENLABS_API_KEY=` з реальним значенням.
+4. Якщо ключ випадково закомічено — негайно відклич його в ElevenLabs dashboard, потім
+   вичисти історію (`git filter-repo` / BFG) і запуш. Ротація ключа обов'язкова.
+5. Скрипт не логує ключ і не зберігає його ніде, крім читання `.env`/змінної середовища.
+
+#### Типові помилки
+
+| Симптом | Ліки |
+|---|---|
+| «Ключ ElevenLabs не знайдено» | немає `.env`, ключ порожній або це заглушка — див. кроки вище |
+| HTTP 401 | невірний/відкликаний ключ — створи новий |
+| HTTP 403 | у ключа немає прав на Text-to-Speech |
+| HTTP 404 | невірний `voice_id` у `voices_config.json` |
+| HTTP 429 | ліміт запитів; скрипт робить до 3 спроб із backoff, далі зачекай |
+| HTTP 422 | порожній текст або некоректні `voice_settings` |
+| Репліка пропущена | для спікера немає голосу і немає `default` |
+| Рот не рухається | `speaker` у назві файлу не збігається з `isSpeaking("char1"/"char2"/...)`; перезапусти `build_dialogue.py` |
+| `build_dialogue.py` падає | немає `ffmpeg`/`ffprobe` у `PATH` |
+| Немає інтернету | озвучка не потрібна для рендера: використай наявні файли або ручний режим |
+
 ---
 
 ## 4. Правила безпеки
@@ -843,13 +996,14 @@ python build_dialogue.py
 
 Без явного прохання користувача **заборонено** видаляти, перейменовувати або переписувати з нуля:
 
-`src/MainScene.tsx`, `src/Character.tsx`, `src/Camera.tsx`, `src/ShotEngine.tsx`, `src/TextOverlays.tsx`, `src/palette.ts`, `src/Root.tsx`, `src/index.ts`, `src/locations/types.ts`, `src/locations/street/*`, `src/characters/types.ts`, `src/characters/index.ts`, `generate_sfx.py`, `build_dialogue.py`, `SOUNDS.md`, `public/sfx/*`.
+`src/MainScene.tsx`, `src/Character.tsx`, `src/Camera.tsx`, `src/ShotEngine.tsx`, `src/TextOverlays.tsx`, `src/palette.ts`, `src/Root.tsx`, `src/index.ts`, `src/locations/types.ts`, `src/locations/street/*`, `src/characters/types.ts`, `src/characters/index.ts`, `generate_sfx.py`, `generate_voices.py`, `build_dialogue.py`, `SOUNDS.md`, `public/sfx/*`.
 
 - Змінюй **точково** (`edit`), зберігаючи публічні експорти та пропи.
 - Нові пропси — тільки опційні; не ламай зворотну сумісність.
 - Не змінюй `id="Popsikos2DAnimations"`, 1080×1920, 30 fps без запиту.
 - Не видаляй еталонну локацію `street` і не ламай інтерфейс `LocationDefinition` у `src/locations/types.ts`.
 - Не чіпай `node_modules`, `.git`, `package-lock.json` без потреби; Remotion 4.0.544 зафіксований.
+- **Секрети:** ніколи не коміть `.env`, не друкуй `ELEVENLABS_API_KEY` і не додавай ключ у код/документацію. У Git живуть лише `.env.example` та `voices_config.example.json`.
 - Не роби `git commit` / `git push`, якщо користувач про це не просив.
 
 ### 4.2 Обов'язкова перевірка кадрів перед рендером
@@ -875,6 +1029,7 @@ python build_dialogue.py
 - [ ] Тривалість відео й аудіо збігається (розбіжність ≤ 0.05 с).
 - [ ] Файл лежить у `out/` під погодженим ім'ям.
 - [ ] Тимчасові PNG/WAV прибрані з `out/` (сам `out/` у `.gitignore`).
+- [ ] `git status` не показує `.env`, `voices_config.json` чи `public/voices/`; у diff немає API-ключа.
 
 ### 4.4 Що можна змінювати вільно
 
@@ -888,6 +1043,8 @@ python build_dialogue.py
 - Нові опційні пропси `Character`/`TextOverlays` з дефолтами.
 - Розширювати `SHOT_PRESETS`/`SHOT_TYPES` у `src/ShotEngine.tsx` новими планами та ефектами (зберігаючи 8 базових пресетів).
 - Додаткові звуки через `generate_sfx.py` + `SOUNDS.md`.
+- Репліки в `script_voices.json` і авто-озвучку через `generate_voices.py` (див. §3.5).
+- Голоси та `voice_settings` у локальному `voices_config.json` (файл gitignored); нові ролі — нові ключі в `voices`.
 - Косметику та нові кольори у `PALETTE` (`src/palette.ts`).
 
 ### 4.5 Відомі граблі
@@ -914,6 +1071,12 @@ python build_dialogue.py
 | Капюшон ховає обличчя | `hood` малює обід поверх волосся; для крупних планів лишай `hood={false}` або піднімай `headTilt`
 | Тиша в кінці | немає фонового беду після останнього SFX — перевір `<Loop>` на `wind_ambient.wav` |
 | Рендер без звуку | `<Audio>` поза композицією / `staticFile` на неіснуючий файл |
+| «Ключ ElevenLabs не знайдено» | немає `.env`, ключ порожній або це заглушка — див. §3.5 |
+| HTTP 401/404 від ElevenLabs | невірний/відкликаний ключ або `voice_id` у `voices_config.json` |
+| HTTP 429 | ліміт запитів — скрипт сам робить 3 спроби, далі зачекай або зменш кількість реплік |
+| `speaker` не збігається зі сценою | файл `02_alex.mp3` дає спікера `alex`, а `MainScene.tsx` чекає `char1`/`char2`; узгодь назви |
+| У таймлайні 6 реплік замість 3 | у `public/voices/` лежать `.wav` і `.mp3` з одним `<NN>_<speaker>`; прибери один або запусти `generate_voices.py --force` (старий стане `.bak`) |
+| `.env` потрапив у Git | негайно відклич ключ у ElevenLabs, вичисти історію (`git filter-repo`/BFG) і запуш; перевір `.gitignore` |
 
 ---
 
@@ -933,7 +1096,8 @@ npx remotion still src/index.ts Popsikos2DAnimations out/shot-1.png --frame=110
 npx remotion still src/index.ts Popsikos2DAnimations out/shot-3.png --frame=560
 npx remotion still src/index.ts Popsikos2DAnimations out/shot-8.png --frame=1685
 python generate_sfx.py
-python build_dialogue.py
+python generate_voices.py            # ElevenLabs TTS -> public/voices/ -> build_dialogue.py
+python build_dialogue.py             # вручну, якщо public/voices/ змінився без generate_voices.py
 npx remotion render src/index.ts Popsikos2DAnimations out/episode.mp4 --codec=h264 --crf=18 --image-format=png --pixel-format=yuv420p
 ```
 

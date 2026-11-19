@@ -3,10 +3,14 @@ dist/
 out/
 .env
 .env.local
+.env.*.local
 .DS_Store
 Thumbs.db
 __pycache__/
 *.py[cod]
+
+# Local ElevenLabs setup - only the *.example files are committed
+voices_config.json
 
 # User-generated voiceovers (keep public/sfx/ tracked as the base sound library)
 public/voices/
