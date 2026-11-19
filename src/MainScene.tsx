@@ -20,6 +20,7 @@ import {
 } from "./ShotEngine";
 import { DynamicCaption, HookTitle } from "./TextOverlays";
 import { DEFAULT_LOCATION, LocationId, getLocation } from "./locations";
+import { Prop, getPropInteractionPoint } from "./props";
 
 /* ------------------------------------------------------------------ */
 /* Timeline: eight shots, one per cinematic preset                     */
@@ -53,6 +54,96 @@ const shotFrames = (index: number): number => {
 const shotEnd = (index: number): number => shotStart(index) + shotFrames(index);
 
 const WIND_LOOP_FRAMES = 360;
+
+/* ------------------------------------------------------------------ */
+/* Interactive prop placements                                         */
+/* The same placement is used by <Prop /> and by getPropInteractionPoint */
+/* so a character's lookAt or an object-focus target stays glued to it. */
+/* ------------------------------------------------------------------ */
+
+const PHONE_SPOT = {
+  x: 1002,
+  y: 1724,
+  scale: 0.6,
+  state: "ringing",
+  eventProgress: 0.75,
+  seed: 23,
+} as const;
+const PHONE_FOCUS = getPropInteractionPoint("phone", PHONE_SPOT);
+
+const NOTEBOOK_SPOT = {
+  x: 545,
+  y: 1698,
+  scale: 0.7,
+  state: "open",
+  eventProgress: 0,
+  seed: 19,
+} as const;
+const NOTEBOOK_FOCUS = getPropInteractionPoint("notebook", NOTEBOOK_SPOT);
+
+const TANKS_SPOT = {
+  x: 66,
+  y: 1700,
+  scale: 0.72,
+  state: "leaking",
+  eventProgress: 0.6,
+  seed: 7,
+} as const;
+
+const PUMP_SPOT = {
+  x: 170,
+  y: 1640,
+  scale: 0.72,
+  state: "pumping",
+  eventProgress: 0.7,
+  seed: 13,
+} as const;
+
+const RADIO_SPOT = {
+  x: 930,
+  y: 1600,
+  scale: 0.78,
+  state: "static",
+  eventProgress: 0.5,
+  seed: 11,
+} as const;
+
+const GENERATOR_SPOT = {
+  x: 540,
+  y: 1660,
+  scale: 1.45,
+  state: "sparking",
+  eventProgress: 0.8,
+  seed: 41,
+} as const;
+const GENERATOR_FOCUS = getPropInteractionPoint("generator", GENERATOR_SPOT);
+
+const TOOLS_SPOT = {
+  x: 900,
+  y: 1640,
+  scale: 0.64,
+  state: "sparks",
+  eventProgress: 0.9,
+  seed: 31,
+} as const;
+
+const FAUCET_SPOT = {
+  x: 842,
+  y: 1746,
+  scale: 0.9,
+  state: "dripping",
+  eventProgress: 0.7,
+  seed: 17,
+} as const;
+
+const DOOR_SPOT = {
+  x: 216,
+  y: 1810,
+  scale: 0.82,
+  state: "banging",
+  eventProgress: 0.8,
+  seed: 29,
+} as const;
 
 /* ------------------------------------------------------------------ */
 /* World: location layers + actors, with optional depth-of-field blur  */
@@ -143,6 +234,10 @@ const ShotWide: React.FC<{
       const mayaTalking = isSpeaking("char2", g);
       return (
         <World camera={camera} location={location}>
+          {/* Environmental props. They sit behind the actors; the phone is the
+              target Maya glances at whenever she is not speaking. */}
+          <Prop id="tanks" {...TANKS_SPOT} />
+          <Prop id="phone" {...PHONE_SPOT} />
           {/* Viktor keeps the group honest: crossed arms, watching both of them. */}
           <Character
             x={176}
@@ -168,14 +263,15 @@ const ShotWide: React.FC<{
               voiceAmplitude: voiceAmplitude("char1", g),
             })}
           />
-          {/* Maya points at the horizon, then reacts to Alex's line. */}
+          {/* Maya points at the horizon, then reacts to Alex's line. When the
+              dialogue pauses she looks down at the prop interactionPoint. */}
           <Character
             x={880}
             y={1654}
             {...characterProps("scout_maya", {
               scale: 1.0,
               armPose: mayaTalking ? "point" : "idle",
-              lookAt: { x: 540, y: 1170 },
+              lookAt: mayaTalking ? { x: 540, y: 1170 } : PHONE_FOCUS,
               isTalking: mayaTalking,
               isListening: alexTalking,
               voiceAmplitude: voiceAmplitude("char2", g),
@@ -211,6 +307,11 @@ const ShotMedium: React.FC<{
       const mayaTalking = isSpeaking("char2", g);
       return (
         <World camera={camera} location={location} backgroundBlur={1.4}>
+          {/* Working pump, a hissing radio and an open field journal frame
+              the dialogue. When nobody talks Alex glances at the journal. */}
+          <Prop id="pump" {...PUMP_SPOT} />
+          <Prop id="radio" {...RADIO_SPOT} />
+          <Prop id="notebook" {...NOTEBOOK_SPOT} />
           {/* Alex leans in and explains; while Maya talks he listens and nods. */}
           <Character
             x={332}
@@ -219,7 +320,10 @@ const ShotMedium: React.FC<{
               scale: 1.58,
               armPose: alexTalking ? "explain" : "idle",
               bodyPosture: alexTalking ? "lean-forward" : "neutral",
-              lookAt: { x: 750, y: 1006 },
+              lookAt:
+                !alexTalking && !mayaTalking
+                  ? NOTEBOOK_FOCUS
+                  : { x: 750, y: 1006 },
               isTalking: alexTalking,
               isListening: mayaTalking,
               voiceAmplitude: voiceAmplitude("char1", g),
@@ -415,7 +519,10 @@ const ShotPov: React.FC<{
     {({ camera }) => (
       <>
         <World camera={camera} location={location} backgroundBlur={1.2}>
-          <></>
+          {/* POV walk-past: a banging blast door on the left, a dripping
+              faucet on the right. Both animate from the frame clock only. */}
+          <Prop id="door" {...DOOR_SPOT} />
+          <Prop id="faucet" {...FAUCET_SPOT} />
         </World>
         <PovForeground />
       </>
@@ -434,19 +541,42 @@ const ShotObjectFocus: React.FC<{
   <CinematicShot
     type="object-focus"
     durationInFrames={durationInFrames}
-    target={{ x: 568, y: 1349 }}
+    target={GENERATOR_FOCUS}
     motion="push-in"
     shake={0.6}
     location={location}
-    label="OBJECT · ROAD SIGN"
+    label="OBJECT · GENERATOR"
   >
-    {({ camera, fx }) => (
+    {({ camera, fx, progress }) => (
       <World
         camera={camera}
         location={location}
         backgroundBlur={fx.focusBlur}
       >
-        <></>
+        {/* Noa points at the generator; `lookAt` and the camera `target` both
+            come from the prop registry interactionPoint. */}
+        <Character
+          x={214}
+          y={1780}
+          {...characterProps("engineer_noa", {
+            scale: 1.05,
+            armPose: "point",
+            bodyPosture: "lean-forward",
+            headTilt: 4,
+            lookAt: GENERATOR_FOCUS,
+            isListening: false,
+          })}
+        />
+        <Prop
+          id="generator"
+          {...GENERATOR_SPOT}
+          eventProgress={0.35 + progress * 0.65}
+        />
+        <Prop
+          id="tools"
+          {...TOOLS_SPOT}
+          eventProgress={0.4 + progress * 0.6}
+        />
       </World>
     )}
   </CinematicShot>

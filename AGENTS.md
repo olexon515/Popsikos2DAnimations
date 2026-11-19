@@ -8,7 +8,7 @@
 
 ## 0. Що це і як почати за 5 хвилин
 
-**Popsikos2DAnimations** — вертикальні 2D-мультфільми на тему апокаліпсису: **1080×1920, 30 fps**, уся графіка — SVG + React, без 3D і без растрових ассетів. Декорації винесені в модульні локації (`src/locations/`), звук синтезований локально (`generate_sfx.py`), озвучку реплік можна згенерувати через ElevenLabs (`generate_voices.py` → `public/voices/*.mp3`), а діалоги та lip-sync — з `public/voices/` (`build_dialogue.py`), титри — CSS-текст із comic-обводкою, а 8 кінематографічних планів (wide → map) дає `src/ShotEngine.tsx`. Акторська гра (5 поз рук, постава, погляд, авто-моргання, кивки, `voiceAmplitude`) живе в `src/Character.tsx`, а готові герої — модульні пресети в `src/characters/`.
+**Popsikos2DAnimations** — вертикальні 2D-мультфільми на тему апокаліпсису: **1080×1920, 30 fps**, уся графіка — SVG + React, без 3D і без растрових ассетів. Декорації винесені в модульні локації (`src/locations/`), інтерактивні предмети — в **Interactive Prop Engine** (`src/props/`: телефон, генератор, рація, кран, насос, резервуари, гермодвері, блокнот, інструменти), звук синтезований локально (`generate_sfx.py`), озвучку реплік можна згенерувати через ElevenLabs (`generate_voices.py` → `public/voices/*.mp3`), а діалоги та lip-sync — з `public/voices/` (`build_dialogue.py`), титри — CSS-текст із comic-обводкою, а 8 кінематографічних планів (wide → map) дає `src/ShotEngine.tsx`. Акторська гра (5 поз рук, постава, погляд, авто-моргання, кивки, `voiceAmplitude`) живе в `src/Character.tsx`, а готові герої — модульні пресети в `src/characters/`.
 
 | Параметр | Значення |
 |---|---|
@@ -19,6 +19,7 @@
 | Еталонна локація | `street` (`src/locations/street/`) |
 | Еталонний персонаж | `survivor_alex` (`src/characters/survivor_alex.ts`) |
 | Акторська система | `src/Character.tsx` — 5 поз рук, постава, погляд, моргання, `voiceAmplitude` (розділи 2.4, 2.10, 2.11) |
+| Інтерактивні пропи | `src/props/` — 9 SVG-предметів зі станами, `eventProgress`, seed та `interactionPoint` (розділ 2.12) |
 | Фінальний рендер | `out/<назва>.mp4` (h264 + AAC 48 kHz stereo) |
 
 **Перші дії нового агента (з кореня проєкту):**
@@ -97,6 +98,18 @@ done
 
 Окремо перевіряй стики планів (`cut`): кадр `224/225`, `449/450`, `674/675`, `899/900`, `1124/1125`, `1349/1350`, `1574/1575` — не має бути щілин, стрибків віньєтки або розмиття, що лишилось від `object-focus`.
 
+Кадри для перевірки інтерактивних пропів (демо-таймлайн, `DURATION=1800`):
+
+```bash
+for f in 110 335 1235 1460; do
+  npx remotion still src/index.ts Popsikos2DAnimations out/prop-$f.png --frame=$f
+done
+```
+
+`110` — телефон + резервуари у `wide`; `335` — насос, рація й блокнот у `medium`;
+`1235` — гермодвері та кран у `pov`; `1460` — генератор + інструменти в `object-focus`
+(перевіряй, що `lookAt` інженера й `target` камери дивляться в ту саму точку пропа).
+
 ### 1.6 Перевірка готового відео
 
 ```bash
@@ -138,6 +151,9 @@ ffmpeg -v info -ss 9 -t 1 -i out/episode.mp4 -vn -af volumedetect -f null NUL 2>
 | `src/characters/types.ts` | контракт `CharacterPreset` / `CharacterLook` для модульного реєстру героїв |
 | `src/characters/index.ts` | реєстр `CHARACTERS`, тип `CharacterId`, хелпер `characterProps()` |
 | `src/characters/<preset>.ts` | готові герої: `survivor_alex`, `scout_maya`, `commander_viktor`, `engineer_noa` |
+| `src/props/types.ts` | контракт `PropDefinition` / `PropProps` / `PropLayout`, `PropPoint` та `resolvePropFocus()` |
+| `src/props/index.ts` | реєстр `PROPS`, тип `PropId`, `<Prop>`-обгортка, `getPropInteractionPoint()` |
+| `src/props/<name>.tsx` | 9 SVG-предметів: `phone`, `generator`, `radio`, `faucet`, `pump`, `tanks`, `door`, `notebook`, `tools` |
 | `src/Camera.tsx` | тип `Camera`, компонент `Layer` (паралакс), `cameraTransform`, `rand`, `clamp`, `lerp`, `smoothstep`, `STATIC_CAMERA` |
 | `src/ShotEngine.tsx` | **Cinematic Shot Engine**: 8 пресетів (`ShotType`), `<CinematicShot>`, `TopDownPlate`, `TacticalMap` |
 | `src/TextOverlays.tsx` | `HookTitle` + `DynamicCaption` (spring, обводка, градієнт) |
@@ -778,6 +794,204 @@ export const CHARACTERS = {
 (на них можуть посилатися сцени), дублювати `seed` у сусідніх героїв або тягнути
 растрові ассети — уся графіка лишається SVG.
 
+### 2.12 Interactive Prop Engine (`src/props/`)
+
+Інтерактивні предмети — третій модульний реєстр проєкту (поруч із локаціями та
+персонажами). Кожен проп — окремий SVG-компонент зі своїм набором станів, детермінованою
+анімацією від кадру та **interactionPoint** у координатах сцени. Ця точка використовується
+двома способами:
+
+- `Character.lookAt` — персонаж повертає зіниці/голову на предмет;
+- `CinematicShot.target` — камера `object-focus` ставить предмет у центр кадру.
+
+```
+src/props/
+├─ types.ts        PropDefinition / PropProps / PropLayout / PropPoint, resolvePropFocus()
+├─ index.ts        PROPS, PropId, <Prop />, getPropInteractionPoint(), PROP_LIST
+├─ shared.tsx      usePropFrame(), loopPhase(), pulse(), PROP_OUTLINE
+├─ phone.tsx       idle | ringing | broken | off
+├─ generator.tsx   off | running | sparking | broken
+├─ radio.tsx       off | static | transmitting
+├─ faucet.tsx      closed | dripping | flowing | dry
+├─ pump.tsx        idle | pumping | jammed
+├─ tanks.tsx       full | half | empty | leaking
+├─ door.tsx        closed | opening | open | banging
+├─ notebook.tsx    closed | open | flipping
+└─ tools.tsx       idle | active | sparks
+```
+
+#### Контракт `PropDefinition`
+
+| Поле / prop | Тип | Що робить |
+|---|---|---|
+| `x`, `y` | `number` (обов'язкові) | **нижній центр** артборду в координатах сцени (та сама площина, що `Character x/y`) |
+| `scale` | `number` | рівномірний масштаб; 1 = 1 одиниця артборду = 1 px сцени |
+| `state` | власний union (напр. `PhoneState`) | стан предмета; невідомий стан у `<Prop>` падає на `defaultState` |
+| `eventProgress` | `number` 0..1 | прогрес одноразової події: вібрація, відкривання дверей, перегортання, іскри |
+| `seed` | `number` | детермінований seed для іскор/крапель/мерехтіння; **без `Math.random()`** |
+| `frame` | `number?` | необов'язкове перекриття кадру; за замовчуванням `useCurrentFrame()` |
+| `style`, `className` | `CSSProperties`, `string?` | косметика контейнера |
+| `size.width/height` | `number` | розмір локального артборду (до `scale`) |
+| `focus` | `PropPoint \| (layout) => PropPoint` | локальна точка фокуса → `interactionPoint` через `resolvePropFocus` |
+| `states`, `defaultState` | `readonly TState[]`, `TState` | валідні стани та дефолт |
+| `Component` | `React.FC<PropProps<TState>>` | сам SVG-компонент |
+
+**Реєстр (`src/props/index.ts`):**
+
+```ts
+import {
+  PROPS,                    // Record<PropId, PropDefinition<...>>
+  PROP_IDS,                 // PropId[]
+  PROP_LIST,                // PropSummary[] для HUD/доків
+  Prop,                     // <Prop id="..." ... /> — рендер за id
+  getPropInteractionPoint,  // (id, placement) => scene-space { x, y }
+  Phone, Generator, Radio, Faucet, Pump, Tanks, Door, Notebook, Tools,
+  phoneProp, generatorProp, radioProp, faucetProp, pumpProp,
+  tanksProp, doorProp, notebookProp, toolsProp,
+} from "./props";
+```
+
+#### 9 базових предметів
+
+| `id` | Файл | Стани | Детермінована анімація | Демо-шот |
+|---|---|---|---|---|
+| `phone` | `phone.tsx` | `idle` \| `ringing` \| `broken` \| `off` | вібрація корпусу, миготіння екрана, хвилі вхідного виклику | `wide` (погляд Maya) |
+| `generator` | `generator.tsx` | `off` \| `running` \| `sparking` \| `broken` | тремтіння корпусу, обертання вала/вентилятора, дим, іскри, масляна калюжа | `object-focus` |
+| `radio` | `radio.tsx` | `off` \| `static` \| `transmitting` | шум екрана, індикатори сигналу, звукові хвилі, LED | `medium` |
+| `faucet` | `faucet.tsx` | `closed` \| `dripping` \| `flowing` \| `dry` | обертання вентиля, краплі, струмінь, бризки | `pov` |
+| `pump` | `pump.tsx` | `idle` \| `pumping` \| `jammed` | рух поршня, маховик, тремтяча стрілка манометра, пара | `medium` |
+| `tanks` | `tanks.tsx` | `full` \| `half` \| `empty` \| `leaking` | рівень рідини, хвилі, бульбашки, тріщина й витік | `wide` |
+| `door` | `door.tsx` | `closed` \| `opening` \| `open` \| `banging` | плавне відчинення, обертання колеса, удари ззовні, пил | `pov` |
+| `notebook` | `notebook.tsx` | `closed` \| `open` \| `flipping` | перегортання сторінки, рукописні рядки, схема вежі | `medium` |
+| `tools` | `tools.tsx` | `idle` \| `active` \| `sparks` | обертання викрутки, розігрів жала, іскри пайки | `object-focus` |
+
+#### Використання: `lookAt` + `object-focus`
+
+```tsx
+import { Prop, getPropInteractionPoint } from "./props";
+
+const GENERATOR_SPOT = {
+  x: 540,
+  y: 1660,
+  scale: 1.45,
+  state: "sparking",
+  eventProgress: 0.8,
+  seed: 41,
+} as const;
+
+// Та сама точка, що її бачить Character.lookAt і камера object-focus.
+const GENERATOR_FOCUS = getPropInteractionPoint("generator", GENERATOR_SPOT);
+
+<Character
+  x={214}
+  y={1780}
+  {...characterProps("engineer_noa", {
+    armPose: "point",
+    lookAt: GENERATOR_FOCUS,
+  })}
+/>
+
+<Prop id="generator" {...GENERATOR_SPOT} />
+
+<CinematicShot
+  type="object-focus"
+  durationInFrames={225}
+  target={GENERATOR_FOCUS}
+  label="OBJECT · GENERATOR"
+>
+  {({ camera, fx }) => (
+    <World camera={camera} backgroundBlur={fx.focusBlur}>
+      <Prop id="generator" {...GENERATOR_SPOT} />
+    </World>
+  )}
+</CinematicShot>
+```
+
+Прямий імпорт компонента теж працює:
+
+```tsx
+import { Phone } from "./props";
+
+<Phone x={1002} y={1724} scale={0.6} state="ringing" eventProgress={0.75} seed={23} />
+```
+
+#### Покрокова інструкція для агента: створити новий проп
+
+Коли користувач просить «додай проп X» (наприклад: `campfire`, `terminal`, `medkit`,
+`elevator`, `camera_drone`), виконай рівно ці кроки:
+
+1. **Придумай `id`** у `snake_case` (`campfire`, `medkit`, `terminal`). Це ключ реєстру;
+   `PropId` підхопить його автоматично.
+2. **Створи `src/props/<id>.tsx`** і почни з констант:
+
+```tsx
+export type CampfireState = "out" | "burning" | "dying";
+export const CAMPFIRE_STATES: readonly CampfireState[] = ["out", "burning", "dying"];
+export const CAMPFIRE_SIZE = { width: 320, height: 260 } as const;
+```
+
+3. **Оголоси компонент** `Campfire: React.FC<PropProps<CampfireState>>`. Усередині:
+   - `const { x, y, scale = 1, state, eventProgress = 0, seed = 0, style, className } = props;`
+   - `const frame = usePropFrame(props);` — єдине джерело часу;
+   - `const event = eventLevel(eventProgress);` — 0..1;
+   - `const layout: PropLayout<CampfireState> = { x, y, scale, state, eventProgress: event, seed };`
+   - кореневий `<div style={propContainerStyle(CAMPFIRE_SIZE, layout, style)}>`, всередині
+     `<svg width="100%" height="100%" viewBox="0 0 320 260" style={{ overflow: "visible" }}>`.
+4. **Малюй SVG у локальних координатах** `0..width × 0..height`, низ артборду = земля.
+   Головний контур — `stroke={INK}` + `strokeWidth={PROP_OUTLINE}` (3 px). Усі `<defs>`
+   отримують унікальний префікс: `const uid = \`fire-${React.useId().replace(/[^a-zA-Z0-9_-]/g, "")}\`;`
+   — інакше два однакові пропи на одному кадрі перетруть градієнти один одного.
+5. **Анімуй тільки детерміновано:** `frame`, `Math.sin/cos`, `loopPhase(frame, len, seed, i)`,
+   `pulse(frame, speed)`, `rand(seed, i)` з `src/Camera.tsx`. `Math.random()`, `Date.now()`,
+   `performance.now()` — заборонені.
+6. **Зроби `eventProgress` осмисленим:** спалах при старті, стрибок полум'я, відкривання,
+   постріл тощо. Якщо подія триває весь шот, у сцені передавай `progress` із
+   `<CinematicShot>`: `eventProgress={progress}`.
+7. **Задай `focus`** — локальну точку, на яку має дивитися персонаж/камера (полум'я,
+   екран, ручка, сопло). Вона може залежати від стану:
+   `focus: (layout) => layout.state === "dying" ? { x: 160, y: 210 } : { x: 160, y: 150 }`.
+8. **Експортуй визначення**:
+
+```tsx
+export const campfireProp: PropDefinition<CampfireState> = {
+  id: "campfire",
+  name: "Campfire",
+  description: "Low fire: out, burning with deterministic sparks, or dying embers.",
+  states: CAMPFIRE_STATES,
+  defaultState: "out",
+  size: CAMPFIRE_SIZE,
+  focus: { x: 160, y: 150 },
+  Component: Campfire,
+};
+```
+
+9. **Зареєструй у `src/props/index.ts`:** імпортуй `Campfire, campfireProp`, додай
+   `campfire: campfireProp` у `PROPS` (порядок = порядок у `PROP_LIST`) і додай обидва
+   імена у `export { ... }`.
+10. **Постав у сцену** через `<Prop id="campfire" x={...} y={...} scale={...} state="burning" />`
+    і, якщо треба погляд/фокус, порахуй точку:
+    `const FIRE = getPropInteractionPoint("campfire", { x, y, scale, state: "burning" });`
+    → `lookAt={FIRE}` або `target={FIRE}`.
+11. **Перевір:** `npm run lint`, потім still-кадри з пропом у кадрі (широкий план + крупний
+    `object-focus`). Дивись: предмет стоїть на землі (не висить), контур 3 px не з'їдений,
+    іскри/краплі не виходять за кадр, `lookAt` і `target` дійсно вказують на `focus`.
+
+**Заборонено:** використовувати `Math.random()`, дублювати SVG `id` між копіями пропа,
+вставляти растрові текстури, ламати існуючі `id` у `PROPS` (на них можуть посилатися сцени)
+та змінювати `size`/`focus` без перевірки `lookAt`/`object-focus`.
+
+#### Граблі пропів
+
+| Симптом | Причина / ліки |
+|---|---|
+| Проп «висить» у повітрі | `y` — це **низ** артборду, а не центр; постав `y` на лінію землі |
+| Погляд/камера дивиться не туди | для `lookAt`/`target` використовуй `getPropInteractionPoint` з тим самим `x/y/scale/state`, що й у `<Prop>` |
+| Два пропи перефарбовують один одного | однакові SVG `id` у `<defs>` — додай `useId()`-префікс |
+| Проп стрибає між кадрами | десь є `Math.random()` або час із `Date.now()` — лиши тільки `frame` + `rand(seed, i)` |
+| Проп не реагує на подію | `eventProgress` не переданий (дефолт 0) — передай `progress` із `CinematicShot` або явне число |
+| Проп закриває обличчя | порядок у `World` важливий: до `<Character>` = позаду, після = спереду; для `medium`/`closeup` став проп у проміжок між героями |
+| Подвійний паралакс / проп «пливе» | не обгортай `<Prop>` у власний `<Layer>` — `World` уже дає depth 1 |
+
 ---
 
 ## 3. Звук та озвучка
@@ -1037,7 +1251,9 @@ python build_dialogue.py
 - Змінювати `look` існуючих пресетів та їхню стандартну поставу, не змінюючи `id`.
 - Ставити акторські пропси (`armPose`, `bodyPosture`, `headTilt`, `lookAt`, `isListening`, `voiceAmplitude`, `seed`) у будь-якому шоті `MainScene.tsx`.
 - Додавати нові риси зовнішності в `Character.tsx` — **тільки опційними пропсами** з дефолтом, що зберігає старий вигляд.
+- Нові пропи в `src/props/` (окремий файл + реєстрація в `PROPS`) та їхні стани/`eventProgress` у сценах.
 - Створювати нові локації у `src/locations/<name>/` за шаблоном `street/` і реєструвати їх у `src/locations/index.ts`.
+- Створювати нові інтерактивні пропи у `src/props/<id>.tsx` за шаблоном `phone.tsx` і реєструвати їх у `src/props/index.ts` (див. §2.12).
 - Перемикати `location` у `MainScene.tsx`, `Root.tsx` або в окремих шотах (`<World location="...">`).
 - Тексти титрів, тайминги появ, гучності окремих звуків (з перевіркою кліпінгу).
 - Нові опційні пропси `Character`/`TextOverlays` з дефолтами.
@@ -1067,6 +1283,10 @@ python build_dialogue.py
 | Погляд «не туди» | `lookAt` — координати **сцени/площини акторів**, а не екрана після зуму; для `flipX` нічого компенсувати не треба, компонент робить це сам |
 | Очі персонажа заплющені на кожному кадрі | `rand(seed, i)` отримав однаковий `seed` у сусідів і збігся з морганням; дай унікальні `seed` у пресетах |
 | Руки «вросли» в корпус | `armPose` змінює геометрію плече→лікоть→зап'ясток; для `crossed`/`point`/`explain` руки малюються поверх куртки, не дублюй їх вручну |
+| Проп «висить» або провалюється під землю | `x/y` пропа — це **нижній центр** артборду; постав `y` на лінію землі (див. §2.12) |
+| `lookAt`/`object-focus` не на предмет | передай у `getPropInteractionPoint` ті самі `x/y/scale/state`, що й у `<Prop>`; не міняй `scale` після розрахунку |
+| Проп не анімується | не переданий `eventProgress` (дефолт 0) або використано `Math.random()`/`Date.now()` замість `frame` + `rand(seed, i)` |
+| Два пропи конфліктують градієнтами | однакові SVG `id` у `<defs>`; додай `React.useId()`-префікс у кожен файл `src/props/*.tsx` |
 | Борода з'їдає рот | зменш висоту бороди або дай `beardColor`, а не `hairColor`; рот малюється після бороди, але темний тон на темному не читається |
 | Капюшон ховає обличчя | `hood` малює обід поверх волосся; для крупних планів лишай `hood={false}` або піднімай `headTilt`
 | Тиша в кінці | немає фонового беду після останнього SFX — перевір `<Loop>` на `wind_ambient.wav` |
@@ -1091,6 +1311,11 @@ npx remotion still src/index.ts Popsikos2DAnimations out/acting-talk1.png --fram
 npx remotion still src/index.ts Popsikos2DAnimations out/acting-talk2.png --frame=112
 npx remotion still src/index.ts Popsikos2DAnimations out/acting-closeup.png --frame=560
 npx remotion still src/index.ts Popsikos2DAnimations out/acting-extreme.png --frame=785
+# інтерактивні пропи (wide / medium / pov / object-focus):
+npx remotion still src/index.ts Popsikos2DAnimations out/prop-wide.png --frame=110
+npx remotion still src/index.ts Popsikos2DAnimations out/prop-medium.png --frame=335
+npx remotion still src/index.ts Popsikos2DAnimations out/prop-pov.png --frame=1235
+npx remotion still src/index.ts Popsikos2DAnimations out/prop-object.png --frame=1460
 # усі 8 шотів (wide, medium, closeup, extreme, top-down, pov, object-focus, map):
 npx remotion still src/index.ts Popsikos2DAnimations out/shot-1.png --frame=110
 npx remotion still src/index.ts Popsikos2DAnimations out/shot-3.png --frame=560

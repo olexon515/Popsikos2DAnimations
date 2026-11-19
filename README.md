@@ -7,9 +7,10 @@
 A pure 2D (SVG + React) vertical cartoon built with [Remotion](https://www.remotion.dev/):
 **1080×1920, 30 fps**, fully local procedural sound design, multi-voice dialogue with
 automatic lip-sync, comic-style Ukrainian typography — plus a **modular location system**
-(`src/locations/`), a **Cinematic Shot Engine** with 8 ready-made shot types
+(`src/locations/`), an **Interactive Prop Engine** with nine stateful SVG objects
+(`src/props/`), a **Cinematic Shot Engine** with 8 ready-made shot types
 (`src/ShotEngine.tsx`) and **advanced character acting** with a modular cast registry
-(`src/characters/`), so you can build new places, new heroes and new camera work with an AI agent.
+(`src/characters/`), so you can build new places, new props, new heroes and new camera work with an AI agent.
 
 - [English](#english)
 - [Українською](#українською)
@@ -70,6 +71,12 @@ src/
 │  ├─ types.ts         CharacterPreset / CharacterLook contract
 │  ├─ index.ts         registry: CHARACTERS, CharacterId, characterProps()
 │  └─ *.ts             survivor_alex, scout_maya, commander_viktor, engineer_noa
+├─ props/
+│  ├─ types.ts         PropDefinition / PropProps contract, resolvePropFocus()
+│  ├─ index.ts         registry: PROPS, PropId, <Prop>, getPropInteractionPoint()
+│  ├─ shared.tsx       usePropFrame(), loopPhase(), pulse(), PROP_OUTLINE
+│  └─ *.tsx            phone, generator, radio, faucet, pump, tanks, door,
+│                      notebook, tools — each with its own states
 ├─ TextOverlays.tsx    HookTitle + DynamicCaption (spring, comic outline)
 ├─ Camera.tsx          parallax Layer, camera type, deterministic random
 ├─ palette.ts          colours + frame constants
@@ -199,6 +206,58 @@ and place it in the scene:
 
 Full step-by-step recipe: [`AGENTS.md` §2.11](./AGENTS.md#211-модульний-реєстр-персонажів-srccharacters).
 
+### Interactive props
+
+`src/props/` is the third modular registry, next to locations and characters. Every prop is
+a standalone SVG component with its own states, frame-deterministic animation and an
+`interactionPoint` in **scene** coordinates. That single point drives both
+`Character.lookAt` (the hero turns eyes and head toward the object) and
+`CinematicShot.target` (the `object-focus` camera puts the object dead centre).
+
+| `id` | States | Animation | Demo shot |
+|---|---|---|---|
+| `phone` | `idle`, `ringing`, `broken`, `off` | body vibration, screen flicker, incoming-call waves | `wide` (Maya looks at it) |
+| `generator` | `off`, `running`, `sparking`, `broken` | casing shake, spinning shaft/fan, smoke, sparks, oil puddle | `object-focus` |
+| `radio` | `off`, `static`, `transmitting` | screen noise, signal LEDs, sound waves | `medium` |
+| `faucet` | `closed`, `dripping`, `flowing`, `dry` | valve rotation, drops, jet, splashes | `pov` |
+| `pump` | `idle`, `pumping`, `jammed` | piston stroke, flywheel, trembling gauge needle, steam | `medium` |
+| `tanks` | `full`, `half`, `empty`, `leaking` | liquid level, surface waves, bubbles, crack and leak | `wide` |
+| `door` | `closed`, `opening`, `open`, `banging` | smooth swing, wheel spin, outside impacts, dust | `pov` |
+| `notebook` | `closed`, `open`, `flipping` | page flip, handwritten lines, tower sketch | `medium` |
+| `tools` | `idle`, `active`, `sparks` | screwdriver spin, heated tip, soldering sparks | `object-focus` |
+
+```tsx
+import { Prop, getPropInteractionPoint } from "./props";
+
+const GENERATOR_SPOT = {
+  x: 540, y: 1660, scale: 1.45,
+  state: "sparking", eventProgress: 0.8, seed: 41,
+} as const;
+
+// the exact same point for the actor's gaze and the object-focus camera
+const GENERATOR_FOCUS = getPropInteractionPoint("generator", GENERATOR_SPOT);
+
+<Character
+  x={214} y={1780}
+  {...characterProps("engineer_noa", { armPose: "point", lookAt: GENERATOR_FOCUS })}
+/>
+
+<Prop id="generator" {...GENERATOR_SPOT} />
+```
+
+`x`/`y` is the **bottom-centre** of the prop's local artboard on the actor plane (depth 1),
+so a prop sits on the ground when `y` is the ground line. `eventProgress` (0..1) drives
+one-shot beats — vibration, door opening, page flips, sparks. Every random-looking detail
+comes from `seed` + `rand(seed, i)`: no `Math.random()` anywhere.
+
+**Ask the agent for a new prop** — it will create `src/props/<id>.tsx`, register it in
+`PROPS` and place it in the scene:
+
+> «Додай проп `campfire` — стан `out` / `burning` / `dying`, детерміновані іскри
+> й дим. Постав його в `wide`, а на `object-focus` наведи камеру на полум'я.»
+
+Full step-by-step recipe: [`AGENTS.md` §2.12](./AGENTS.md#212-interactive-prop-engine-srcprops).
+
 ### Automatic voice-over with ElevenLabs
 
 `generate_voices.py` turns a plain text script into the dialogue track — no extra Python
@@ -303,6 +362,7 @@ What the agent does under the hood (defined in `AGENTS.md`):
 | Step | Command / file |
 |---|---|
 | New character | `src/characters/<role>_<name>.ts` → registered in `src/characters/index.ts` |
+| New prop | `src/props/<id>.tsx` → registered in `src/props/index.ts` → placed with `<Prop id=…>` |
 | New location | `src/locations/<name>/` → registered in `src/locations/index.ts` |
 | New sound | function + `library` entry in `generate_sfx.py` → `python generate_sfx.py` → row in `SOUNDS.md` |
 | New dialogue | `script_voices.json` → `python generate_voices.py` (ElevenLabs) or drop `public/voices/NN_speaker.mp3` → `python build_dialogue.py` |
@@ -315,6 +375,8 @@ What the agent does under the hood (defined in `AGENTS.md`):
 - Characters are actors: arm poses, posture, gaze targeting, blinks and listening nods are
   deterministic (`rand(seed, i)` + frame-based `sin`), and mouths follow real voice amplitude.
 - Heroes are modular presets (`src/characters/`); a new look never requires a new rig.
+- Props are modular too (`src/props/`): each one has typed states, an `eventProgress` beat
+  and a computed `interactionPoint` for `lookAt` and `object-focus`.
 - Sound is synthesised from noise and oscillators, then cleaned and limited with ffmpeg.
 - Voice-over is generated by `generate_voices.py` (ElevenLabs, stdlib only); the API key
   lives in a gitignored `.env`, never in the repo.
@@ -400,6 +462,12 @@ src/
 │  ├─ types.ts         контракт CharacterPreset / CharacterLook
 │  ├─ index.ts         реєстр: CHARACTERS, CharacterId, characterProps()
 │  └─ *.ts             survivor_alex, scout_maya, commander_viktor, engineer_noa
+├─ props/
+│  ├─ types.ts         контракт PropDefinition / PropProps, resolvePropFocus()
+│  ├─ index.ts         реєстр: PROPS, PropId, <Prop>, getPropInteractionPoint()
+│  ├─ shared.tsx       usePropFrame(), loopPhase(), pulse(), PROP_OUTLINE
+│  └─ *.tsx            phone, generator, radio, faucet, pump, tanks, door,
+│                      notebook, tools — кожен зі своїми станами
 ├─ TextOverlays.tsx    HookTitle + DynamicCaption (spring, comic-обводка)
 ├─ Camera.tsx          паралакс Layer, тип Camera, детермінований random
 ├─ palette.ts          кольори + константи кадру
@@ -529,6 +597,58 @@ export const CHARACTERS = {
 
 Покроковий рецепт: [`AGENTS.md` §2.11](./AGENTS.md#211-модульний-реєстр-персонажів-srccharacters).
 
+### Інтерактивні пропи
+
+`src/props/` — третій модульний реєстр проєкту, поруч із локаціями та персонажами. Кожен
+проп — окремий SVG-компонент зі своїми станами, детермінованою від кадру анімацією та
+`interactionPoint` у **координатах сцени**. Одна ця точка керує і `Character.lookAt`
+(герой повертає зіниці й голову на предмет), і `CinematicShot.target` (камера
+`object-focus` ставить предмет у центр кадру).
+
+| `id` | Стани | Анімація | Демо-шот |
+|---|---|---|---|
+| `phone` | `idle`, `ringing`, `broken`, `off` | вібрація корпусу, миготіння екрана, хвилі вхідного виклику | `wide` (погляд Maya) |
+| `generator` | `off`, `running`, `sparking`, `broken` | тремтіння корпусу, обертання вала/вентилятора, дим, іскри, масляна калюжа | `object-focus` |
+| `radio` | `off`, `static`, `transmitting` | шум екрана, індикатори сигналу, звукові хвилі | `medium` |
+| `faucet` | `closed`, `dripping`, `flowing`, `dry` | обертання вентиля, краплі, струмінь, бризки | `pov` |
+| `pump` | `idle`, `pumping`, `jammed` | рух поршня, маховик, тремтяча стрілка манометра, пара | `medium` |
+| `tanks` | `full`, `half`, `empty`, `leaking` | рівень рідини, хвилі, бульбашки, тріщина й витік | `wide` |
+| `door` | `closed`, `opening`, `open`, `banging` | плавне відчинення, обертання колеса, удари ззовні, пил | `pov` |
+| `notebook` | `closed`, `open`, `flipping` | перегортання сторінки, рукописні рядки, схема вежі | `medium` |
+| `tools` | `idle`, `active`, `sparks` | обертання викрутки, розігрів жала, іскри пайки | `object-focus` |
+
+```tsx
+import { Prop, getPropInteractionPoint } from "./props";
+
+const GENERATOR_SPOT = {
+  x: 540, y: 1660, scale: 1.45,
+  state: "sparking", eventProgress: 0.8, seed: 41,
+} as const;
+
+// та сама точка для погляду актора й камери object-focus
+const GENERATOR_FOCUS = getPropInteractionPoint("generator", GENERATOR_SPOT);
+
+<Character
+  x={214} y={1780}
+  {...characterProps("engineer_noa", { armPose: "point", lookAt: GENERATOR_FOCUS })}
+/>
+
+<Prop id="generator" {...GENERATOR_SPOT} />
+```
+
+`x`/`y` — це **нижній центр** локального артборду пропа на площині акторів (depth 1),
+тому предмет стоїть на землі, коли `y` збігається з лінією землі. `eventProgress` (0..1)
+веде одноразові події — вібрацію, відкривання дверей, перегортання, іскри. Уся
+«випадковість» береться з `seed` + `rand(seed, i)`: жодного `Math.random()`.
+
+**Попроси агента створити проп** — він зробить `src/props/<id>.tsx`, зареєструє його
+в `PROPS` і поставить у сцену:
+
+> «Додай проп `campfire` — стан `out` / `burning` / `dying`, детерміновані іскри
+> й дим. Постав його в `wide`, а на `object-focus` наведи камеру на полум'я.»
+
+Покроковий рецепт: [`AGENTS.md` §2.12](./AGENTS.md#212-interactive-prop-engine-srcprops).
+
 ### Авто-озвучка через ElevenLabs
 
 `generate_voices.py` перетворює звичайний текстовий сценарій на готову дорожку діалогів —
@@ -635,6 +755,7 @@ python generate_voices.py
 | Крок | Команда / файл |
 |---|---|
 | Новий герой | `src/characters/<role>_<name>.ts` → реєстрація в `src/characters/index.ts` |
+| Новий проп | `src/props/<id>.tsx` → реєстрація в `src/props/index.ts` → постановка через `<Prop id=…>` |
 | Нова локація | `src/locations/<name>/` → реєстрація в `src/locations/index.ts` |
 | Новий звук | функція + запис у `library` в `generate_sfx.py` → `python generate_sfx.py` → рядок у `SOUNDS.md` |
 | Нова озвучка | `script_voices.json` → `python generate_voices.py` (ElevenLabs) або поклади `public/voices/NN_speaker.mp3` → `python build_dialogue.py` |
@@ -647,6 +768,8 @@ python generate_voices.py
 - Персонажі — актори: пози рук, постава, погляд, моргання й кивки детерміновані
   (`rand(seed, i)` + `sin` від кадру), а рот слідує за реальною амплітудою голосу.
 - Герої — модульні пресети (`src/characters/`); новий вигляд не потребує нового рига.
+- Пропи теж модульні (`src/props/`): у кожного типізовані стани, подія `eventProgress`
+  та обчислена точка `interactionPoint` для `lookAt` і `object-focus`.
 - Звук синтезований із шуму й осциляторів, потім очищений і обмежений через ffmpeg.
 - Озвучку генерує `generate_voices.py` (ElevenLabs, лише stdlib); ключ API живе в
   gitignored `.env` і ніколи не потрапляє в репозиторій.

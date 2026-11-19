@@ -1,6 +1,6 @@
 ---
 name: popsikos-2d-animations
-description: Create and edit vertical 2D cartoons with Remotion - pure SVG/React characters with advanced acting (5 arm poses, body posture, gaze targeting, auto-blinks, listening nods, voice-driven mouths), a modular character registry (src/characters/), modular parallax locations (src/locations/), an 8-type cinematic shot engine (wide, medium, closeup, extreme-closeup, top-down, POV, object-focus, map), comic-style titles, procedurally generated WAV sound design, ElevenLabs voice-over generation (generate_voices.py, eleven_flash_v2_5, key kept in a gitignored .env), lip-sync dialogue timeline and vertical 1080x1920 rendering. Universal workflow for 2D animation projects built on this template - new characters, locations, scenes, shots, sounds, voices, captions, lint, still-frame checks and renders.
+description: Create and edit vertical 2D cartoons with Remotion - pure SVG/React characters with advanced acting (5 arm poses, body posture, gaze targeting, auto-blinks, listening nods, voice-driven mouths), a modular character registry (src/characters/), modular parallax locations (src/locations/), an interactive prop engine (src/props/) with 9 SVG props, per-prop states, eventProgress and scene-space interactionPoint for lookAt/object-focus, an 8-type cinematic shot engine (wide, medium, closeup, extreme-closeup, top-down, POV, object-focus, map), comic-style titles, procedurally generated WAV sound design, ElevenLabs voice-over generation (generate_voices.py, eleven_flash_v2_5, key kept in a gitignored .env), lip-sync dialogue timeline and vertical 1080x1920 rendering. Universal workflow for 2D animation projects built on this template - new characters, locations, props, scenes, shots, sounds, voices, captions, lint, still-frame checks and renders.
 ---
 
 # SKILL.md — Popsikos2DAnimations
@@ -18,7 +18,7 @@ description: Create and edit vertical 2D cartoons with Remotion - pure SVG/React
 
 ## 0. Що це і як почати за 5 хвилин
 
-**Popsikos2DAnimations** — вертикальні 2D-мультфільми на тему апокаліпсису: **1080×1920, 30 fps**, уся графіка — SVG + React, без 3D і без растрових ассетів. Декорації винесені в модульні локації (`src/locations/`), звук синтезований локально (`generate_sfx.py`), озвучку реплік можна згенерувати через ElevenLabs (`generate_voices.py` → `public/voices/*.mp3`), а діалоги та lip-sync — з `public/voices/` (`build_dialogue.py`), титри — CSS-текст із comic-обводкою, а 8 кінематографічних планів (wide → map) дає `src/ShotEngine.tsx`. Акторська гра (5 поз рук, постава, погляд, авто-моргання, кивки, `voiceAmplitude`) живе в `src/Character.tsx`, а готові герої — модульні пресети в `src/characters/`.
+**Popsikos2DAnimations** — вертикальні 2D-мультфільми на тему апокаліпсису: **1080×1920, 30 fps**, уся графіка — SVG + React, без 3D і без растрових ассетів. Декорації винесені в модульні локації (`src/locations/`), інтерактивні предмети — в **Interactive Prop Engine** (`src/props/`: телефон, генератор, рація, кран, насос, резервуари, гермодвері, блокнот, інструменти), звук синтезований локально (`generate_sfx.py`), озвучку реплік можна згенерувати через ElevenLabs (`generate_voices.py` → `public/voices/*.mp3`), а діалоги та lip-sync — з `public/voices/` (`build_dialogue.py`), титри — CSS-текст із comic-обводкою, а 8 кінематографічних планів (wide → map) дає `src/ShotEngine.tsx`. Акторська гра (5 поз рук, постава, погляд, авто-моргання, кивки, `voiceAmplitude`) живе в `src/Character.tsx`, а готові герої — модульні пресети в `src/characters/`.
 
 | Параметр | Значення |
 |---|---|
@@ -148,6 +148,9 @@ ffmpeg -v info -ss 9 -t 1 -i out/episode.mp4 -vn -af volumedetect -f null NUL 2>
 | `src/characters/types.ts` | контракт `CharacterPreset` / `CharacterLook` для модульного реєстру героїв |
 | `src/characters/index.ts` | реєстр `CHARACTERS`, тип `CharacterId`, хелпер `characterProps()` |
 | `src/characters/<preset>.ts` | готові герої: `survivor_alex`, `scout_maya`, `commander_viktor`, `engineer_noa` |
+| `src/props/types.ts` | контракт `PropDefinition` / `PropProps` / `PropLayout` / `PropPoint`, `resolvePropFocus()` |
+| `src/props/index.ts` | реєстр `PROPS`, тип `PropId`, `<Prop>`-обгортка, `getPropInteractionPoint()` |
+| `src/props/<name>.tsx` | 9 SVG-предметів: `phone`, `generator`, `radio`, `faucet`, `pump`, `tanks`, `door`, `notebook`, `tools` |
 | `src/Camera.tsx` | тип `Camera`, компонент `Layer` (паралакс), `cameraTransform`, `rand`, `clamp`, `lerp`, `smoothstep`, `STATIC_CAMERA` |
 | `src/ShotEngine.tsx` | **Cinematic Shot Engine**: 8 пресетів (`ShotType`), `<CinematicShot>`, `TopDownPlate`, `TacticalMap` |
 | `src/TextOverlays.tsx` | `HookTitle` + `DynamicCaption` (spring, обводка, градієнт) |
@@ -787,6 +790,121 @@ export const CHARACTERS = {
 **Заборонено:** змінювати `id="Popsikos2DAnimations"`, ламати існуючі `id` пресетів
 (на них можуть посилатися сцени), дублювати `seed` у сусідніх героїв або тягнути
 растрові ассети — уся графіка лишається SVG.
+
+### 2.12 Interactive Prop Engine (`src/props/`)
+
+Інтерактивні предмети — третій модульний реєстр (поруч із локаціями та персонажами).
+Кожен проп — окремий SVG-компонент зі своїми станами, детермінованою анімацією від кадру
+та **interactionPoint** у координатах сцени для `Character.lookAt` і `CinematicShot.target`
+(`object-focus`).
+
+```
+src/props/
+├─ types.ts        PropDefinition / PropProps / PropLayout / PropPoint, resolvePropFocus()
+├─ index.ts        PROPS, PropId, <Prop />, getPropInteractionPoint(), PROP_LIST
+├─ shared.tsx      usePropFrame(), loopPhase(), pulse(), PROP_OUTLINE
+├─ phone.tsx       idle | ringing | broken | off
+├─ generator.tsx   off | running | sparking | broken
+├─ radio.tsx       off | static | transmitting
+├─ faucet.tsx      closed | dripping | flowing | dry
+├─ pump.tsx        idle | pumping | jammed
+├─ tanks.tsx       full | half | empty | leaking
+├─ door.tsx        closed | opening | open | banging
+├─ notebook.tsx    closed | open | flipping
+└─ tools.tsx       idle | active | sparks
+```
+
+#### Контракт
+
+| Поле / prop | Тип | Що робить |
+|---|---|---|
+| `x`, `y` | `number` (обов'язкові) | **нижній центр** артборду в координатах сцени (та сама площина, що `Character x/y`) |
+| `scale` | `number` | рівномірний масштаб; 1 = 1 одиниця артборду = 1 px сцени |
+| `state` | власний union | стан предмета; невідомий стан у `<Prop>` падає на `defaultState` |
+| `eventProgress` | `number` 0..1 | прогрес події: вібрація, відкривання, перегортання, іскри |
+| `seed` | `number` | детермінований seed; **без `Math.random()`** |
+| `frame` | `number?` | необов'язкове перекриття; за замовч. `useCurrentFrame()` |
+| `size`, `focus` | `{width,height}`, `PropPoint \| fn` | артборд і локальна точка фокуса → `interactionPoint` |
+| `states`, `defaultState` | `readonly TState[]`, `TState` | валідні стани та дефолт |
+| `Component` | `React.FC<PropProps<TState>>` | SVG-компонент |
+
+**API реєстру:**
+
+```ts
+import {
+  PROPS, PROP_IDS, PROP_LIST, Prop, getPropInteractionPoint,
+  Phone, Generator, Radio, Faucet, Pump, Tanks, Door, Notebook, Tools,
+  phoneProp, generatorProp, radioProp, faucetProp, pumpProp,
+  tanksProp, doorProp, notebookProp, toolsProp,
+} from "./props";
+```
+
+#### 9 базових предметів
+
+| `id` | Файл | Стани | Детермінована анімація | Демо-шот |
+|---|---|---|---|---|
+| `phone` | `phone.tsx` | `idle` \| `ringing` \| `broken` \| `off` | вібрація, миготіння екрана, хвилі виклику | `wide` (погляд Maya) |
+| `generator` | `generator.tsx` | `off` \| `running` \| `sparking` \| `broken` | тремтіння, обертання вала, дим, іскри, масло | `object-focus` |
+| `radio` | `radio.tsx` | `off` \| `static` \| `transmitting` | шум екрана, індикатори, звукові хвилі, LED | `medium` |
+| `faucet` | `faucet.tsx` | `closed` \| `dripping` \| `flowing` \| `dry` | обертання вентиля, краплі, струмінь, бризки | `pov` |
+| `pump` | `pump.tsx` | `idle` \| `pumping` \| `jammed` | поршень, маховик, тремтячий манометр, пара | `medium` |
+| `tanks` | `tanks.tsx` | `full` \| `half` \| `empty` \| `leaking` | рівень рідини, хвилі, бульбашки, витік | `wide` |
+| `door` | `door.tsx` | `closed` \| `opening` \| `open` \| `banging` | відчинення, колесо, удари, пил | `pov` |
+| `notebook` | `notebook.tsx` | `closed` \| `open` \| `flipping` | перегортання, рукопис, схема вежі | `medium` |
+| `tools` | `tools.tsx` | `idle` \| `active` \| `sparks` | викрутка, розігрів жала, іскри пайки | `object-focus` |
+
+#### `lookAt` + `object-focus`
+
+```tsx
+import { Prop, getPropInteractionPoint } from "./props";
+
+const GENERATOR_SPOT = {
+  x: 540, y: 1660, scale: 1.45,
+  state: "sparking", eventProgress: 0.8, seed: 41,
+} as const;
+
+const GENERATOR_FOCUS = getPropInteractionPoint("generator", GENERATOR_SPOT);
+
+<Character
+  x={214}
+  y={1780}
+  {...characterProps("engineer_noa", { armPose: "point", lookAt: GENERATOR_FOCUS })}
+/>
+<Prop id="generator" {...GENERATOR_SPOT} />
+
+<CinematicShot type="object-focus" durationInFrames={225} target={GENERATOR_FOCUS}>
+  {({ camera, fx }) => (
+    <World camera={camera} backgroundBlur={fx.focusBlur}>
+      <Prop id="generator" {...GENERATOR_SPOT} />
+    </World>
+  )}
+</CinematicShot>
+```
+
+#### Покрокова інструкція: новий проп
+
+1. **`id`** у `snake_case` (`campfire`, `medkit`, `terminal`).
+2. **Створи `src/props/<id>.tsx`**: `export type <Name>State`, `<NAME>_STATES`,
+   `<NAME>_SIZE = { width, height } as const`.
+3. **Компонент** `React.FC<PropProps<State>>`: `usePropFrame(props)`, `eventLevel(...)`,
+   `layout: PropLayout<State>`, корінь `<div style={propContainerStyle(SIZE, layout, style)}>`,
+   всередині `<svg viewBox="0 0 W H" style={{ overflow: "visible" }}>`.
+4. **Малюй у локальних координатах**: низ артборду = земля, головний контур
+   `stroke={INK}` + `strokeWidth={PROP_OUTLINE}` (3 px). Усі `<defs>` — з `useId()`-префіксом.
+5. **Анімуй детерміновано:** `frame`, `sin/cos`, `loopPhase(frame, len, seed, i)`,
+   `pulse(frame, speed)`, `rand(seed, i)`. Заборонено `Math.random()`/`Date.now()`.
+6. **`eventProgress`** — смислова подія; у сцені можна передати `progress` із `CinematicShot`.
+7. **`focus`** — локальна точка (екран, полум'я, ручка); може залежати від `layout.state`.
+8. **Експортуй `<name>Prop: PropDefinition<State>`** з `id`, `name`, `description`,
+   `states`, `defaultState`, `size`, `focus`, `Component`.
+9. **Зареєструй** у `src/props/index.ts`: імпорт, `PROPS.<id> = <name>Prop`, експорт.
+10. **Постав у сцену** через `<Prop id="..." x y scale state />`; для погляду/камери —
+    `getPropInteractionPoint` з тими самими `x/y/scale/state`.
+11. **Перевір:** `npm run lint` + still-кадри (широкий план і `object-focus`).
+
+**Граблі:** `y` — це низ артборду (не центр); однакові SVG `id` між копіями ламають
+градієнти (лікує `useId()`); не обгортай `<Prop>` у власний `<Layer>` (подвійний паралакс);
+порядок у `World` визначає, позаду чи перед персонажем стоїть предмет.
 
 ---
 
