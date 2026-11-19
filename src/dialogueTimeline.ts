@@ -59,3 +59,30 @@ export const isSpeaking = (speaker: string, frame: number): boolean => {
   if (!envelope) return false;
   return envelope[Math.round(frame)] === 1;
 };
+
+/**
+ * 0..1 voice loudness on the global frame - feed it straight into
+ * `<Character voiceAmplitude={...} />` for a smooth closed -> half -> scream mouth.
+ *
+ * The 0/1 envelope is windowed (2 frames each side) and modulated with a
+ * syllabic flutter. Fully deterministic: `Math.sin` only, no `Math.random()`.
+ */
+export const voiceAmplitude = (speaker: string, frame: number): number => {
+  const envelope = (ENVELOPES as Record<string, readonly number[] | undefined>)[speaker];
+  if (!envelope || envelope.length === 0) return 0;
+  const f = Math.round(frame);
+  let loud = 0;
+  let weight = 0;
+  for (let d = -2; d <= 2; d += 1) {
+    const i = f + d;
+    if (i < 0 || i >= envelope.length) continue;
+    const w = 1 - Math.abs(d) / 3;
+    weight += w;
+    if (envelope[i] === 1) loud += w;
+  }
+  if (weight === 0) return 0;
+  const base = loud / weight;
+  if (base < 0.08) return 0;
+  const flutter = 0.6 + 0.4 * Math.abs(Math.sin(f * 0.85 + 0.6));
+  return Math.min(1, base * flutter);
+};

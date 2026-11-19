@@ -8,7 +8,7 @@
 
 ## 0. Що це і як почати за 5 хвилин
 
-**Popsikos2DAnimations** — вертикальні 2D-мультфільми на тему апокаліпсису: **1080×1920, 30 fps**, уся графіка — SVG + React, без 3D і без растрових ассетів. Декорації винесені в модульні локації (`src/locations/`), звук синтезований локально (`generate_sfx.py`), діалоги та lip-sync генеруються з `public/voices/` (`build_dialogue.py`), титри — CSS-текст із comic-обводкою, а 8 кінематографічних планів (wide → map) дає `src/ShotEngine.tsx`.
+**Popsikos2DAnimations** — вертикальні 2D-мультфільми на тему апокаліпсису: **1080×1920, 30 fps**, уся графіка — SVG + React, без 3D і без растрових ассетів. Декорації винесені в модульні локації (`src/locations/`), звук синтезований локально (`generate_sfx.py`), діалоги та lip-sync генеруються з `public/voices/` (`build_dialogue.py`), титри — CSS-текст із comic-обводкою, а 8 кінематографічних планів (wide → map) дає `src/ShotEngine.tsx`. Акторська гра (5 поз рук, постава, погляд, авто-моргання, кивки, `voiceAmplitude`) живе в `src/Character.tsx`, а готові герої — модульні пресети в `src/characters/`.
 
 | Параметр | Значення |
 |---|---|
@@ -17,6 +17,8 @@
 | Точка входу | `src/index.ts` → `src/Root.tsx` → `src/MainScene.tsx` |
 | Тривалість за замовч. | `TOTAL_FRAMES` із `src/dialogueTimeline.ts` (мінімум 1800 кадрів = 60 с @ 30 fps; якщо потрібно 12 с без озвучки — налаштовується в `build_dialogue.py` / `palette.ts`) |
 | Еталонна локація | `street` (`src/locations/street/`) |
+| Еталонний персонаж | `survivor_alex` (`src/characters/survivor_alex.ts`) |
+| Акторська система | `src/Character.tsx` — 5 поз рук, постава, погляд, моргання, `voiceAmplitude` (розділи 2.4, 2.10, 2.11) |
 | Фінальний рендер | `out/<назва>.mp4` (h264 + AAC 48 kHz stereo) |
 
 **Перші дії нового агента (з кореня проєкту):**
@@ -79,6 +81,11 @@ npx remotion still src/index.ts Popsikos2DAnimations out/check-150.png --frame=1
 
 Обов'язкові кадри для перевірки після змін: **30** (заголовок), **118** (вихід заголовка), **150** (крик + підпис), **240** (склейка), **300** і **340** (Персонаж 2 + підпис), або відповідні ключові кадри нового сценарію. Дивись, що текст не закриває рот, немає щілин між шарами, гліфи не обрізані.
 
+Акторські кадри (після змін у `Character.tsx` / `src/characters/`): **34** (моргання Alex),
+**60** (Alex `explain` + `voiceAmplitude`), **112** (Maya `point`, Alex слухає), **560** (крупний
+план, погляд на знак), **785** (extreme close-up у goggles). Перевіряй, що рот/очі не закриті
+титрами, руки не входять у корпус, окуляри й борода не з'їдають обличчя.
+
 Перевірка всіх 8 шотів (по одному кадру з середини кожного плану при `DURATION=1800`):
 
 ```bash
@@ -126,7 +133,10 @@ ffmpeg -v info -ss 9 -t 1 -i out/episode.mp4 -vn -af volumedetect -f null NUL 2>
 | `src/Root.tsx` | реєструє `<Composition id="Popsikos2DAnimations">` з `WIDTH/HEIGHT/FPS/DURATION` та `defaultProps={{ location: DEFAULT_LOCATION }}` |
 | `src/palette.ts` | `INK`, `PALETTE`, `WIDTH=1080`, `HEIGHT=1920`, `FPS=30`, `DURATION=TOTAL_FRAMES`, `HORIZON_Y=1180` |
 | `src/MainScene.tsx` | головна сцена: 8 шотів через `CinematicShot`, `World` (рендерить обрану локацію + depth-of-field), `Atmosphere`, `<Audio>`, титри |
-| `src/Character.tsx` | SVG-маріонетка: очі, зіниці, рот, дихання, мова |
+| `src/Character.tsx` | SVG-маріонетка: очі, зіниці, рот, дихання, мова + **Advanced Character Acting** (5 поз рук, постава, погляд, авто-моргання, `voiceAmplitude`) |
+| `src/characters/types.ts` | контракт `CharacterPreset` / `CharacterLook` для модульного реєстру героїв |
+| `src/characters/index.ts` | реєстр `CHARACTERS`, тип `CharacterId`, хелпер `characterProps()` |
+| `src/characters/<preset>.ts` | готові герої: `survivor_alex`, `scout_maya`, `commander_viktor`, `engineer_noa` |
 | `src/Camera.tsx` | тип `Camera`, компонент `Layer` (паралакс), `cameraTransform`, `rand`, `clamp`, `lerp`, `smoothstep`, `STATIC_CAMERA` |
 | `src/ShotEngine.tsx` | **Cinematic Shot Engine**: 8 пресетів (`ShotType`), `<CinematicShot>`, `TopDownPlate`, `TacticalMap` |
 | `src/TextOverlays.tsx` | `HookTitle` + `DynamicCaption` (spring, обводка, градієнт) |
@@ -154,10 +164,10 @@ ffmpeg -v info -ss 9 -t 1 -i out/episode.mp4 -vn -af volumedetect -f null NUL 2>
 
 | Кадри | `ShotType` | Що в кадрі | Камера / ефект |
 |---|---|---|---|
-| 0–224 | `wide` | Char 1 + Char 2 на повний зріст, місто, сонце | zoom 1.02→1.12, плавний push-in, легкий handheld |
-| 225–449 | `medium` | діалог двох персонажів по пояс/до колін | zoom 1.25→1.35, `pan`, злегка розмитий далекий план |
-| 450–674 | `closeup` | обличчя Char 1 + підпис на 48% | zoom 1.5→1.65, автоматичний `panY`-підйом, DOF 2.5 px |
-| 675–899 | `extreme-closeup` | очі на весь кадр | zoom 2.1→2.4, імпульс входу 7 кадрів, вібрація, grain |
+| 0–224 | `wide` | Alex + Maya + Viktor на повний зріст; жести, погляди, реакції | zoom 1.02→1.12, плавний push-in, легкий handheld |
+| 225–449 | `medium` | діалог Alex ↔ Maya: `explain`/`point`, схрещені руки, кивки | zoom 1.25→1.35, `pan`, злегка розмитий далекий план |
+| 450–674 | `closeup` | обличчя Alex + підпис на 48%, погляд на дорожній знак | zoom 1.5→1.65, автоматичний `panY`-підйом, DOF 2.5 px |
+| 675–899 | `extreme-closeup` | очі Maya в goggles на весь кадр | zoom 2.1→2.4, імпульс входу 7 кадрів, вібрація, grain |
 | 900–1124 | `top-down` | маківки героїв, мангал/знак/дерево зверху | plate + орбітальний `pan`, roll ±1.8° |
 | 1125–1349 | `pov` | вулиця від першої особи + плечі глядача | handheld 7 px, walk-cycle 1.85 Hz, POV-віньєтка |
 | 1350–1574 | `object-focus` | дорожній знак, ретикул, боке | zoom 1.7→1.95, CSS blur 7 px на далеких шарах |
@@ -205,7 +215,7 @@ transform = perspective(p) translate3d(tx,ty,0) rotateX(tiltX·min(1,depth)) rot
 
 `CinematicShot` сам клампить `panX/panY` до bleed-запасу шару: `maxPan = (zoom − 1) × size/2 × 0.94`. Якщо збільшуєш `panX/panY` або опускаєш `zoom` — обов'язково перевір кадри на щілини по краях і знизу.
 
-### 2.4 `Character.tsx` — точні пропи
+### 2.4 `Character.tsx` — точні пропи (базові + акторські)
 
 ```tsx
 <Character
@@ -222,26 +232,70 @@ transform = perspective(p) translate3d(tx,ty,0) rotateX(tiltX·min(1,depth)) rot
 />
 ```
 
+Акторський варіант (усе — **опційні** пропи, старі виклики працюють без змін):
+
+```tsx
+<Character
+  x={540}
+  y={1900}
+  scale={2.05}
+  {...characterProps("survivor_alex", { lookAt: { x: 660, y: 1340 } })}
+  armPose="explain"
+  bodyPosture="lean-forward"
+  headTilt={-4}
+  isListening={false}
+  voiceAmplitude={voiceAmplitude("char1", globalFrame)}
+/>
+```
+
+#### Базові пропи
+
 | Prop | Тип | За замовч. | Що робить |
 |---|---|---|---|
 | `x` | `number` (обов'язковий) | — | центр персонажа по X у px кадру |
 | `y` | `number` (обов'язковий) | — | **лінія стоп** у px; контейнер зсунутий `translate(-50%, -100%)` |
 | `scale` | `number` | `1` | масштаб; локальне полотно 400×640 |
-| `flipX` | `boolean` | `false` | дзеркалить SVG; `sunSide` при цьому міняється місцями автоматично |
+| `flipX` | `boolean` | `false` | дзеркалить SVG; `sunSide` і **локальний напрямок зіниць** враховуються автоматично |
 | `eyeType` | `"normal" \| "wide" \| "squint" \| "angry"` | `"normal"` | `wide` зменшує зіниці; `squint` — вузька лінза; `angry` додає брови |
-| `pupilOffset` | `{ x: number; y: number }` | `{x:0,y:0}` | зсув зіниць, обрізається до −7…7 |
-| `mouthType` | `"closed" \| "half" \| "scream" \| "sad" \| "smirk"` | `"closed"` | форма рота |
-| `isTalking` | `boolean` | `false` | перемикає рот кожні 3 кадри; `smirk` зберігається |
+| `pupilOffset` | `{ x: number; y: number }` | `{x:0,y:0}` | ручний зсув зіниць, обрізається до −7…7; **ігнорується, якщо заданий `lookAt`** |
+| `mouthType` | `"closed" \| "half" \| "scream" \| "sad" \| "smirk"` | `"closed"` | форма рота в спокої |
+| `isTalking` | `boolean` | `false` | старий lip-sync: перемикає рот кожні 3 кадри; `smirk` зберігається. Якщо заданий `voiceAmplitude`, рот веде амплітуда |
 | `bodyColor` | `string` | `PALETTE.jacketBlue` | колір куртки |
 | `skinColor` | `string` | `PALETTE.skin` | шкіра |
 | `hairColor` | `string` | `PALETTE.hair` | волосся |
 | `sunSide` | `"left" \| "right"` | `"left"` | **у screen-space**; всередині враховується `flipX` |
 | `shadow` | `boolean` | `true` | м'яка овальна тінь під ногами |
-| `breathePhase` | `number` | `0` | фазовий зсув дихання/похитування для розсинхрону двох персонажів |
+| `breathePhase` | `number` | `0` | фазовий зсув дихання/похитування для розсинхрону персонажів |
 
-Геометрія (локальні координати SVG 400×640): голова `cx=200 cy=168 r=92`, очі `y=158 x=168/232`, рот `(200,214)`, контур **3px**, ступні на `y≈606`. Мікрорухи: дихання `sin(t*1.5)*3.2`, sway `±0.75°`, кивок голови, нахил. `isTalking` не змінює `mouthType` назовні — назовні це лише прапорець.
+#### Акторські пропи (Advanced Character Acting)
 
-**Правило сумісності:** нові параметри додавай тільки як **опційні** з дефолтом. Не перейменовуй і не видаляй існуючі пропи — на них зав'язані всі три шоти.
+| Prop | Тип | За замовч. | Що робить |
+|---|---|---|---|
+| `armPose` | `"idle" \| "shock" \| "explain" \| "point" \| "crossed"` | `"idle"` | 5 окремих поз рук: плече → лікоть → зап'ясток однією квадратичною кривою, контур **3 px** (`ink 29 / колір 23`). `shock` — руки вгору з відкритими долонями; `explain` — права долоня вперед; `point` — вказівний палець; `crossed` — руки схрещені на грудях |
+| `bodyPosture` | `"neutral" \| "lean-forward" \| "recoil" \| "slumped"` | `"neutral"` | пластика корпусу навколо таза (rot + dy + scaleY): нахил уперед, відсмикування, зсутуленість; голова отримує додатковий `headDy` |
+| `headTilt` | `number` | `0` | додатковий нахил голови в градусах (**−** вліво, **+** вправо); додається до живих мікрорухів і до автоматичного повороту за `lookAt` |
+| `lookAt` | `{ x: number; y: number }` | — | точка в **координатах сцени** (та сама площина, що `x`/`y` персонажа). Персонаж сам рахує вектор `dx/dy` від центру голови `y − 472·scale`, повертає зіниці (до ±7 локальних одиниць) і додає легкий поворот голови ≤ 6°. Для `flipX` X-компонента дзеркалиться |
+| `isListening` | `boolean` | `false` | реактивне слухання: детерміновані легкі кивки головою кожні ~2.5 с (13 кадрів руху, амплітуда 2.4–5.6° з `rand(seed, cycle)`) |
+| `voiceAmplitude` | `number` 0..1 | — | плавна амплітуда голосу (бери `voiceAmplitude(speaker, frame)` з `dialogueTimeline.ts`). Рот безперервно морфиться `closed → half → scream` замість дискретного перемикання; за < 0.03 показується `mouthType` |
+| `seed` | `number` | `0` | сід для детермінованих моргань/кивків/дрібного дрейфу погляду; у пресетів різний, щоб герої не блимали синхронно |
+
+**Авто-моргання:** без `Math.random()` — інтервали будуються з `rand(seed, i)`: перша серія на кадрі `24 + rand(seed,7)·46`, далі пауза `58–144` кадри. Закриття триває **3–4 кадри**, перший/останній кадр — напівприкриті (0.55), середина — повністю (1.0). Вії малюються окремою дугою.
+
+**Геометрія:** локальне полотно 400×640, голова `cx=200 cy=168 r=92`, очі `y=158 x=168/232`, рот `(200,214)`, ступні `y≈606`. Плечі `(146/254, 294)`, таз `(200,470)`. Дихання `sin(t*1.5)*3.2`, sway `±0.75°`.
+
+#### Пропси зовнішності (для пресетів)
+
+| Prop | Тип | За замовч. | Що робить |
+|---|---|---|---|
+| `hairStyle` | `"crop" \| "long" \| "braid" \| "bun" \| "mohawk" \| "bald"` | `"crop"` | зачіска; `braid` додає косу, `bun` — пучок, `long` — масу волосся за головою |
+| `glasses` | `"none" \| "round" \| "square" \| "goggles"` | `"none"` | окуляри або тактичні goggles зі strap-ом |
+| `hood` | `boolean` | `false` | капюшон (задня маса + передній обід + комір); колір = `accentColor` або `bodyColor` |
+| `backpack` | `boolean` | `false` | рюкзак: два боки за корпусом + лямки поверх куртки; колір = `accentColor` |
+| `beard` | `boolean` | `false` | борода + вуса; малюється під ротом, рот лишається читабельним |
+| `beardColor` | `string` | `hairColor` | окремий тон бороди (сива борода краще темніша за волосся) |
+| `accentColor` | `string` | — | шарф/комір/лямки/капюшон одним акцентним кольором |
+
+**Правило сумісності:** нові параметри додавай тільки як **опційні** з дефолтом. Не перейменовуй і не видаляй існуючі пропи — на них зав'язані всі шоти. Повний опис акторської системи та реєстру — розділи **2.10** і **2.11**.
 
 ### 2.5 `TextOverlays.tsx` — точні пропи
 
@@ -546,6 +600,179 @@ console.log(camera.zoom, camera.panY, fx.focusPoint);
 - Усі ефекти детерміновані: `rand(seed, i)` + frame-based `sin`. `Math.random()` заборонений.
 - Нові пресети додавай у `SHOT_PRESETS` і `SHOT_TYPES`; `ShotType` виводиться з ключів `SHOT_PRESETS`, тому TS сам підкаже, де оновити демо.
 
+### 2.10 Advanced Character Acting — як ставити гру
+
+Акторська система живе в `src/Character.tsx` і керується пропсами, тому один і той самий
+компонент грає і головного героя, і масовку. Ключові принципи:
+
+1. **Пози рук — це дані, не код у сцені.** `armPose` обирає одну з п'яти поз у `ARM_POSES`;
+   позицію задають лише три точки (плече, лікоть, зап'ясток), а рука малюється однією
+   квадратичною кривою з двома проходами (`INK` 29 px → колір куртки 23 px = рівний контур 3 px).
+2. **Поза може змінюватися під час шоту.** Пропси читаються щокадру, тож можна робити
+   `armPose={speaking ? "point" : "crossed"}` — персонаж відповідає жестом рівно на своїй репліці.
+3. **Погляд — у координатах сцени, не екрана.** `lookAt={{ x, y }}` — це та сама площина, де
+   стоять актори (`<Layer depth={1}>`). Не передавай координати камери/зуму: `Character` сам
+   знає своє положення і масштаб. Якщо персонаж `flipX`, X-напрямок дзеркалиться автоматично.
+4. **`voiceAmplitude` замінює старий `isTalking`.** Бери готовий хелпер із `dialogueTimeline.ts`:
+
+```tsx
+import { isSpeaking, voiceAmplitude } from "./dialogueTimeline";
+import { characterProps } from "./characters";
+
+const g = from + frame; // глобальний кадр композиції
+
+<Character
+  x={332}
+  y={1732}
+  {...characterProps("survivor_alex", {
+    armPose: isSpeaking("char1", g) ? "explain" : "idle",
+    lookAt: { x: 752, y: 1006 },
+    isListening: isSpeaking("char2", g),
+    voiceAmplitude: voiceAmplitude("char1", g),
+  })}
+/>
+```
+
+`voiceAmplitude` віконує 0/1-огинаючу (±2 кадри) і додає детермінований складовий флаттер,
+тому рот відкривається плавно: `0` → закрита лінія/`mouthType`, `≈0.4` → `half`, `≈1` → `scream`.
+Не викликай `Math.random()` для «живості» — усі мікрорухи вже засіяні через `seed`.
+
+5. **Слухання — це окремий шар гри.** `isListening` вмикає кивки кожні ~2.5 с; вмикай його
+   лише тоді, коли говорить **інший** персонаж (`isListening={otherTalking}`), інакше герой
+   киватиме сам собі.
+6. **Моргання безперервне.** Воно не залежить від `isTalking`: очі закриваються на 3–4 кадри
+   з інтервалом 58–144 кадри, серії різні для кожного `seed`.
+
+Рекомендовані комбінації:
+
+| Стан | `armPose` | `bodyPosture` | Інше |
+|---|---|---|---|
+| спокійна присутність | `idle` | `neutral` | `lookAt` на співрозмовника |
+| пояснює | `explain` | `lean-forward` | `voiceAmplitude` + `headTilt` 2–4° |
+| наказує / вказує | `point` | `neutral` | різкий `lookAt` у бік цілі |
+| шок / тривога | `shock` | `recoil` | `eyeType="wide"`, `headTilt` протилежний руху |
+| слухає | `crossed` / `idle` | `neutral` | `isListening`, погляд на мовця |
+| втома / розбитість | `idle` | `slumped` | `mouthType="sad"`, повільний `breathePhase` |
+
+### 2.11 Модульний реєстр персонажів (`src/characters/`)
+
+Персонажі, як і локації, — це модулі. Кожен герой — окремий файл-пресет, який описує
+**зовнішність і стандартну поставу**, але не позицію на сцені й не живу гру.
+
+```
+src/characters/
+├─ types.ts              CharacterLook / CharacterPreset
+├─ index.ts              CHARACTERS, CharacterId, getCharacter(), characterProps()
+├─ survivor_alex.ts      blue field jacket, crop + stubble, backpack
+├─ scout_maya.ts         plum hoodie, braid, goggles, scarf
+├─ commander_viktor.ts   command coat, bald + grey beard, crossed arms
+└─ engineer_noa.ts       teal jumpsuit, bun, square glasses, tool backpack
+```
+
+Публічний API:
+
+```ts
+import {
+  CHARACTERS,        // Record<CharacterId, CharacterPreset>
+  CHARACTER_LIST,    // масив пресетів у порядку реєстрації
+  CHARACTER_IDS,     // CharacterId[]
+  DEFAULT_CHARACTER, // "survivor_alex"
+  getCharacter,      // (id) => CharacterPreset
+  characterProps,    // (id, overrides?) => Partial<CharacterProps>
+} from "./characters";
+```
+
+`characterProps` збирає `look` пресета й мерджить overrides — це стандартний спосіб
+поставити героя в шот:
+
+```tsx
+<Character
+  x={540}
+  y={1674}
+  {...characterProps("scout_maya", {
+    scale: 1.04,                       // масштаб під конкретний план
+    lookAt: { x: 332, y: 986 },        // координати сцени
+    isTalking: mayaTalking,
+    voiceAmplitude: voiceAmplitude("char2", g),
+    isListening: alexTalking,
+  })}
+/>
+```
+
+#### Покрокова інструкція для агента: створити нового персонажа
+
+Коли користувач просить нового героя (наприклад: «додай медика з рудим хвостом і
+медичною сумкою»), виконай рівно ці кроки:
+
+1. **Придумай `id`** у `snake_case`: `<role>_<name>` (`medic_oleg`, `sniper_kira`).
+   Це ключ реєстру; він потрапить у `CharacterId` автоматично.
+2. **Створи файл `src/characters/<id>.ts`** за шаблоном:
+
+```ts
+import { PALETTE } from "../palette";
+import type { CharacterPreset } from "./types";
+
+export const medicOleg: CharacterPreset = {
+  id: "medic_oleg",
+  name: "Oleg",
+  role: "Medic / sniper support",
+  look: {
+    scale: 1.06,
+    eyeType: "normal",
+    mouthType: "closed",
+    bodyColor: PALETTE.jacketOlive,
+    skinColor: PALETTE.skin,
+    hairColor: PALETTE.hairAuburn,
+    hairStyle: "bun",
+    glasses: "round",
+    hood: false,
+    backpack: true,
+    beard: false,
+    accentColor: "#7C3B44",
+    armPose: "idle",
+    bodyPosture: "neutral",
+    headTilt: -3,
+    sunSide: "left",
+    breathePhase: 0.9,
+    seed: 131, // унікальний, щоб моргання не збігалося
+  },
+};
+```
+
+3. **Вибери риси, які реально розрізняють героїв** — не копіюй попередній пресет:
+   інша зачіска (`hairStyle`), інший силует (`hood`, `backpack`, `beard`), інші
+   окуляри (`glasses`), інший акцент (`accentColor`), інший зріст (`scale` 0.95–1.2),
+   інший `seed`. Обличчя має читатися навіть у `wide`.
+4. **Кольори** бери з `PALETTE` (`jacketBlue`, `jacketPlum`, `jacketOlive`, `jacketTeal`,
+   `coatCommand`, `hairGrey`, `hairAuburn`, `hairBlonde`). Якщо потрібен новий тон —
+   додай його в `PALETTE` (`src/palette.ts`), а не розкидай hex по сцені.
+5. **Зареєструй пресет** у `src/characters/index.ts`:
+
+```ts
+import { medicOleg } from "./medic_oleg";
+
+export const CHARACTERS = {
+  survivor_alex: survivorAlex,
+  scout_maya: scoutMaya,
+  commander_viktor: commanderViktor,
+  engineer_noa: engineerNoa,
+  medic_oleg: medicOleg,
+} as const satisfies Record<string, CharacterPreset>;
+```
+
+6. **Постав героя в сцену** через `characterProps("medic_oleg", { ... })` у потрібному
+   `ShotWide`/`ShotMedium`/`ShotCloseup`. Дай йому `lookAt` на співрозмовника та
+   `isListening={otherTalking}` — інакше він виглядатиме «вирізаним».
+7. **Перевір:** `npm run lint`, потім `npx remotion still` на кадрі, де герой у кадрі
+   (широкий і крупний план). Дивись: обличчя не закрите волоссям/капюшоном, борода не
+   з'їдає рот, руки не входять у корпус, окуляри не зсунуті, персонаж не обрізаний.
+8. **Онови документацію**, якщо додаєш нову рису зовнішності: рядок у таблиці §2.4 і
+   приклад у цьому розділі.
+
+**Заборонено:** змінювати `id="Popsikos2DAnimations"`, ламати існуючі `id` пресетів
+(на них можуть посилатися сцени), дублювати `seed` у сусідніх героїв або тягнути
+растрові ассети — уся графіка лишається SVG.
+
 ---
 
 ## 3. Звук та озвучка
@@ -600,8 +827,8 @@ import { Audio, Sequence, interpolate, staticFile } from "remotion";
 python build_dialogue.py
 ```
 
-3. Скрипт виміряє тривалість кожного файлу через `ffprobe`, розставить репліки з паузою `0.25 s`, згенерує `src/dialogueTimeline.ts` з `TOTAL_FRAMES`, масивом `DIALOGUE` та `ENVELOPES` для кожного спікера.
-4. У `MainScene.tsx` уже підключені `DIALOGUE` (озвучка) та `isSpeaking("char1" | "char2" | "narrator", globalFrame)` (автоматичне керування `isTalking` і `mouthType`).
+3. Скрипт виміряє тривалість кожного файлу через `ffprobe`, розставить репліки з паузою `0.25 s`, згенерує `src/dialogueTimeline.ts` з `TOTAL_FRAMES`, масивом `DIALOGUE`, `ENVELOPES` та хелперами `isSpeaking()` / `voiceAmplitude()` для кожного спікера.
+4. У `MainScene.tsx` уже підключені `DIALOGUE` (озвучка), `isSpeaking("char1" | "char2" | "narrator", globalFrame)` (автоматичне керування `isTalking`) і `voiceAmplitude(speaker, globalFrame)` (плавна амплітуда для `Character.voiceAmplitude`).
 
 **Правила якісної синхронізації:**
 - рот має бути закритий у паузах ≥ 4–6 кадрів та під час реплік `narrator`;
@@ -616,7 +843,7 @@ python build_dialogue.py
 
 Без явного прохання користувача **заборонено** видаляти, перейменовувати або переписувати з нуля:
 
-`src/MainScene.tsx`, `src/Character.tsx`, `src/Camera.tsx`, `src/ShotEngine.tsx`, `src/TextOverlays.tsx`, `src/palette.ts`, `src/Root.tsx`, `src/index.ts`, `src/locations/types.ts`, `src/locations/street/*`, `generate_sfx.py`, `build_dialogue.py`, `SOUNDS.md`, `public/sfx/*`.
+`src/MainScene.tsx`, `src/Character.tsx`, `src/Camera.tsx`, `src/ShotEngine.tsx`, `src/TextOverlays.tsx`, `src/palette.ts`, `src/Root.tsx`, `src/index.ts`, `src/locations/types.ts`, `src/locations/street/*`, `src/characters/types.ts`, `src/characters/index.ts`, `generate_sfx.py`, `build_dialogue.py`, `SOUNDS.md`, `public/sfx/*`.
 
 - Змінюй **точково** (`edit`), зберігаючи публічні експорти та пропи.
 - Нові пропси — тільки опційні; не ламай зворотну сумісність.
@@ -651,6 +878,10 @@ python build_dialogue.py
 
 ### 4.4 Що можна змінювати вільно
 
+- Створювати нових героїв у `src/characters/<id>.ts` і реєструвати їх у `src/characters/index.ts` (див. §2.11).
+- Змінювати `look` існуючих пресетів та їхню стандартну поставу, не змінюючи `id`.
+- Ставити акторські пропси (`armPose`, `bodyPosture`, `headTilt`, `lookAt`, `isListening`, `voiceAmplitude`, `seed`) у будь-якому шоті `MainScene.tsx`.
+- Додавати нові риси зовнішності в `Character.tsx` — **тільки опційними пропсами** з дефолтом, що зберігає старий вигляд.
 - Створювати нові локації у `src/locations/<name>/` за шаблоном `street/` і реєструвати їх у `src/locations/index.ts`.
 - Перемикати `location` у `MainScene.tsx`, `Root.tsx` або в окремих шотах (`<World location="...">`).
 - Тексти титрів, тайминги появ, гучності окремих звуків (з перевіркою кліпінгу).
@@ -675,6 +906,12 @@ python build_dialogue.py
 | Камера «стрибає» на карті | для `map` використовуй `motion="static"` і `shake ≤ 0.5`, інакше HUD-текст тремтить |
 | `target` не туди наводить | `target` — координати площини акторів (depth 1); для `Midground` (0.78) компенсуй зсув вручну |
 | Рот не рухається | не запущено `python build_dialogue.py` після зміни `public/voices/` або `isTalking` не збігається з Sequence |
+| Рот не рухається при `voiceAmplitude` | амплітуда < 0.03 у паузі — це нормально; перевір, що ти передаєш глобальний кадр `from + frame`, а не локальний `frame` |
+| Погляд «не туди» | `lookAt` — координати **сцени/площини акторів**, а не екрана після зуму; для `flipX` нічого компенсувати не треба, компонент робить це сам |
+| Очі персонажа заплющені на кожному кадрі | `rand(seed, i)` отримав однаковий `seed` у сусідів і збігся з морганням; дай унікальні `seed` у пресетах |
+| Руки «вросли» в корпус | `armPose` змінює геометрію плече→лікоть→зап'ясток; для `crossed`/`point`/`explain` руки малюються поверх куртки, не дублюй їх вручну |
+| Борода з'їдає рот | зменш висоту бороди або дай `beardColor`, а не `hairColor`; рот малюється після бороди, але темний тон на темному не читається |
+| Капюшон ховає обличчя | `hood` малює обід поверх волосся; для крупних планів лишай `hood={false}` або піднімай `headTilt`
 | Тиша в кінці | немає фонового беду після останнього SFX — перевір `<Loop>` на `wind_ambient.wav` |
 | Рендер без звуку | `<Audio>` поза композицією / `staticFile` на неіснуючий файл |
 
@@ -685,6 +922,12 @@ python build_dialogue.py
 ```bash
 npm run lint
 npx remotion still src/index.ts Popsikos2DAnimations out/check.png --frame=150
+# акторські кадри (моргання / explain / point / close-up / extreme):
+npx remotion still src/index.ts Popsikos2DAnimations out/acting-blink.png --frame=34
+npx remotion still src/index.ts Popsikos2DAnimations out/acting-talk1.png --frame=60
+npx remotion still src/index.ts Popsikos2DAnimations out/acting-talk2.png --frame=112
+npx remotion still src/index.ts Popsikos2DAnimations out/acting-closeup.png --frame=560
+npx remotion still src/index.ts Popsikos2DAnimations out/acting-extreme.png --frame=785
 # усі 8 шотів (wide, medium, closeup, extreme, top-down, pov, object-focus, map):
 npx remotion still src/index.ts Popsikos2DAnimations out/shot-1.png --frame=110
 npx remotion still src/index.ts Popsikos2DAnimations out/shot-3.png --frame=560

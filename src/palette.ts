@@ -32,6 +32,15 @@ export const PALETTE = {
   jacketPlum: "#3B2B4E",
   hair: "#1B1224",
   shadow: "#1A2238",
+  // character wardrobe (src/characters/ presets)
+  jacketOlive: "#4B4A34",
+  jacketTeal: "#2A474B",
+  coatCommand: "#3B2230",
+  strap: "#161220",
+  hairGrey: "#8B8794",
+  hairAuburn: "#5A2B23",
+  hairBlonde: "#8A6A3C",
+  lens: "#8FE3F0",
 } as const;
 
 export const WIDTH = 1080;

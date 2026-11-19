@@ -9,7 +9,8 @@ import {
 } from "remotion";
 import { Camera, Layer } from "./Camera";
 import { Character, MouthType } from "./Character";
-import { DIALOGUE, HAS_DIALOGUE, isSpeaking } from "./dialogueTimeline";
+import { characterProps } from "./characters";
+import { DIALOGUE, HAS_DIALOGUE, isSpeaking, voiceAmplitude } from "./dialogueTimeline";
 import { DURATION, HEIGHT, PALETTE, WIDTH } from "./palette";
 import {
   CinematicShot,
@@ -136,35 +137,53 @@ const ShotWide: React.FC<{
     location={location}
     label
   >
-    {({ camera, frame }) => (
-      <World camera={camera} location={location}>
-        <Character
-          x={300}
-          y={1640}
-          scale={1.06}
-          eyeType="normal"
-          pupilOffset={{ x: -2, y: -6 }}
-          mouthType="closed"
-          isTalking={isSpeaking("char1", from + frame)}
-          sunSide="right"
-          breathePhase={0}
-          bodyColor={PALETTE.jacketBlue}
-        />
-        <Character
-          x={790}
-          y={1672}
-          scale={1.0}
-          flipX
-          eyeType="squint"
-          pupilOffset={{ x: 6, y: 1 }}
-          mouthType="half"
-          isTalking={isSpeaking("char2", from + frame)}
-          sunSide="left"
-          breathePhase={2.1}
-          bodyColor={PALETTE.jacketPlum}
-        />
-      </World>
-    )}
+    {({ camera, frame }) => {
+      const g = from + frame;
+      const alexTalking = isSpeaking("char1", g);
+      const mayaTalking = isSpeaking("char2", g);
+      return (
+        <World camera={camera} location={location}>
+          {/* Viktor keeps the group honest: crossed arms, watching both of them. */}
+          <Character
+            x={176}
+            y={1642}
+            {...characterProps("commander_viktor", {
+              scale: 1.0,
+              armPose: "crossed",
+              lookAt: { x: 540, y: 1174 },
+              isListening: alexTalking || mayaTalking,
+            })}
+          />
+          {/* Alex explains with an open palm while his eyes flick to Maya. */}
+          <Character
+            x={540}
+            y={1674}
+            {...characterProps("survivor_alex", {
+              scale: 1.04,
+              armPose: alexTalking ? "explain" : "idle",
+              bodyPosture: alexTalking ? "lean-forward" : "neutral",
+              lookAt: { x: 880, y: 1170 },
+              isTalking: alexTalking,
+              isListening: !alexTalking && mayaTalking,
+              voiceAmplitude: voiceAmplitude("char1", g),
+            })}
+          />
+          {/* Maya points at the horizon, then reacts to Alex's line. */}
+          <Character
+            x={880}
+            y={1654}
+            {...characterProps("scout_maya", {
+              scale: 1.0,
+              armPose: mayaTalking ? "point" : "idle",
+              lookAt: { x: 540, y: 1170 },
+              isTalking: mayaTalking,
+              isListening: alexTalking,
+              voiceAmplitude: voiceAmplitude("char2", g),
+            })}
+          />
+        </World>
+      );
+    }}
   </CinematicShot>
 );
 
@@ -186,35 +205,43 @@ const ShotMedium: React.FC<{
     location={location}
     label
   >
-    {({ camera, frame }) => (
-      <World camera={camera} location={location} backgroundBlur={1.4}>
-        <Character
-          x={340}
-          y={1730}
-          scale={1.55}
-          eyeType="normal"
-          pupilOffset={{ x: 5, y: -1 }}
-          mouthType="closed"
-          isTalking={isSpeaking("char1", from + frame)}
-          sunSide="right"
-          breathePhase={0.3}
-          bodyColor={PALETTE.jacketBlue}
-        />
-        <Character
-          x={740}
-          y={1740}
-          scale={1.5}
-          flipX
-          eyeType="squint"
-          pupilOffset={{ x: -6, y: 0 }}
-          mouthType="smirk"
-          isTalking={isSpeaking("char2", from + frame)}
-          sunSide="left"
-          breathePhase={2.4}
-          bodyColor={PALETTE.jacketPlum}
-        />
-      </World>
-    )}
+    {({ camera, frame }) => {
+      const g = from + frame;
+      const alexTalking = isSpeaking("char1", g);
+      const mayaTalking = isSpeaking("char2", g);
+      return (
+        <World camera={camera} location={location} backgroundBlur={1.4}>
+          {/* Alex leans in and explains; while Maya talks he listens and nods. */}
+          <Character
+            x={332}
+            y={1732}
+            {...characterProps("survivor_alex", {
+              scale: 1.58,
+              armPose: alexTalking ? "explain" : "idle",
+              bodyPosture: alexTalking ? "lean-forward" : "neutral",
+              lookAt: { x: 750, y: 1006 },
+              isTalking: alexTalking,
+              isListening: mayaTalking,
+              voiceAmplitude: voiceAmplitude("char1", g),
+            })}
+          />
+          {/* Maya answers with a point; the rest of the time her arms are crossed. */}
+          <Character
+            x={752}
+            y={1742}
+            {...characterProps("scout_maya", {
+              scale: 1.55,
+              armPose: mayaTalking ? "point" : "crossed",
+              bodyPosture: mayaTalking ? "recoil" : "neutral",
+              lookAt: { x: 332, y: 986 },
+              isTalking: mayaTalking,
+              isListening: alexTalking,
+              voiceAmplitude: voiceAmplitude("char2", g),
+            })}
+          />
+        </World>
+      );
+    }}
   </CinematicShot>
 );
 
@@ -236,26 +263,33 @@ const ShotCloseup: React.FC<{
     location={location}
     label
   >
-    {({ camera, fx, frame }) => (
-      <World
-        camera={camera}
-        location={location}
-        backgroundBlur={fx.focusBlur}
-      >
-        <Character
-          x={540}
-          y={1900}
-          scale={2.05}
-          eyeType="wide"
-          pupilOffset={{ x: Math.sin(frame * 0.6) * 2, y: -3 }}
-          mouthType={isSpeaking("char1", from + frame) ? "half" : "sad"}
-          isTalking={isSpeaking("char1", from + frame)}
-          sunSide="right"
-          breathePhase={0.4}
-          bodyColor={PALETTE.jacketBlue}
-        />
-      </World>
-    )}
+    {({ camera, fx, frame }) => {
+      const g = from + frame;
+      const speaking = isSpeaking("char1", g);
+      return (
+        <World
+          camera={camera}
+          location={location}
+          backgroundBlur={fx.focusBlur}
+        >
+          {/* Alex talks to the group, but his gaze keeps sliding to the road sign. */}
+          <Character
+            x={540}
+            y={1900}
+            {...characterProps("survivor_alex", {
+              scale: 2.05,
+              eyeType: "wide",
+              bodyPosture: speaking ? "lean-forward" : "neutral",
+              armPose: speaking ? "explain" : "idle",
+              headTilt: -3,
+              lookAt: { x: 660, y: 1340 },
+              isTalking: speaking,
+              voiceAmplitude: voiceAmplitude("char1", g),
+            })}
+          />
+        </World>
+      );
+    }}
   </CinematicShot>
 );
 
@@ -284,17 +318,19 @@ const ShotExtreme: React.FC<{
           location={location}
           backgroundBlur={fx.focusBlur}
         >
+          {/* Goggles catch the light as Maya's pupils track something off-frame. */}
           <Character
             x={540}
             y={1980}
-            scale={3}
-            eyeType="wide"
-            pupilOffset={{ x: 2, y: 0 }}
-            mouthType={mouth}
-            isTalking={false}
-            sunSide="right"
-            breathePhase={0.4}
-            bodyColor={PALETTE.jacketBlue}
+            {...characterProps("scout_maya", {
+              scale: 3,
+              eyeType: "wide",
+              mouthType: mouth,
+              armPose: "shock",
+              headTilt: 3,
+              lookAt: { x: 890, y: 640 },
+              isListening: false,
+            })}
           />
         </World>
       )}

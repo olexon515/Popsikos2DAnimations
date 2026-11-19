@@ -7,8 +7,9 @@
 A pure 2D (SVG + React) vertical cartoon built with [Remotion](https://www.remotion.dev/):
 **1080×1920, 30 fps**, fully local procedural sound design, multi-voice dialogue with
 automatic lip-sync, comic-style Ukrainian typography — plus a **modular location system**
-(`src/locations/`) and a **Cinematic Shot Engine** with 8 ready-made shot types
-(`src/ShotEngine.tsx`), so you can build new places and new camera work with an AI agent.
+(`src/locations/`), a **Cinematic Shot Engine** with 8 ready-made shot types
+(`src/ShotEngine.tsx`) and **advanced character acting** with a modular cast registry
+(`src/characters/`), so you can build new places, new heroes and new camera work with an AI agent.
 
 - [English](#english)
 - [Українською](#українською)
@@ -57,11 +58,16 @@ src/
 ├─ Root.tsx            composition registration (1080x1920, 30 fps, DURATION)
 ├─ MainScene.tsx      eight shots, camera, grade, audio mix, text overlays
 ├─ ShotEngine.tsx      8 cinematic shot types + plates/effects
-├─ Character.tsx       SVG puppet: 4 eye types, 5 mouths, breathing, talking
+├─ Character.tsx       SVG actor: eyes, mouths, breathing + 5 arm poses, posture,
+│                      gaze targeting, auto-blinks, listening nods, voice amplitude
+├─ characters/
+│  ├─ types.ts         CharacterPreset / CharacterLook contract
+│  ├─ index.ts         registry: CHARACTERS, CharacterId, characterProps()
+│  └─ *.ts             survivor_alex, scout_maya, commander_viktor, engineer_noa
 ├─ TextOverlays.tsx    HookTitle + DynamicCaption (spring, comic outline)
 ├─ Camera.tsx          parallax Layer, camera type, deterministic random
 ├─ palette.ts          colours + frame constants
-├─ dialogueTimeline.ts generated dialogue + speech envelopes
+├─ dialogueTimeline.ts generated dialogue + speech envelopes + voiceAmplitude()
 └─ locations/
    ├─ types.ts         LocationDefinition contract
    ├─ index.ts         registry: LOCATIONS, LocationId, getLocation()
@@ -134,6 +140,59 @@ and `map` ship their own plates (`TopDownPlate`, `TacticalMap`). Need the camera
 without React? `computeShot({ type, durationInFrames, frame, target, motion, shake })`
 is a pure solver. Full API, presets and pitfalls: [`AGENTS.md` §2.9](./AGENTS.md#29-cinematic-shot-engine-srcshotenginetsx).
 
+### Character acting & the cast registry
+
+`src/Character.tsx` is a real actor, not a sticker: every performance knob is an optional
+prop, so old scenes keep rendering exactly as before.
+
+| Prop | Values | What it does |
+|---|---|---|
+| `armPose` | `idle`, `shock`, `explain`, `point`, `crossed` | five hand-authored arm performances, shoulder → elbow → wrist on one smooth curve, 3 px outline |
+| `bodyPosture` | `neutral`, `lean-forward`, `recoil`, `slumped` | torso rotation + drop + vertical squash around the hips |
+| `headTilt` | degrees | extra head tilt on top of the living micro-motion |
+| `lookAt` | `{ x, y }` in **scene** coordinates | the actor solves the gaze vector itself and turns pupils (plus a small head turn) toward that point |
+| `isListening` | `boolean` | deterministic light head nods every ~2.5 s while someone else talks |
+| `voiceAmplitude` | `0..1` | continuous mouth morph `closed → half → scream`, fed by `voiceAmplitude(speaker, frame)` |
+| `seed` | `number` | unique blink / nod / gaze-idle pattern (no `Math.random()` anywhere) |
+
+Wardrobe props (`hairStyle`, `glasses`, `hood`, `backpack`, `beard`, `accentColor`) make the
+same puppet read as a different hero without duplicating the rig.
+
+Heroes live in `src/characters/` as small presets and are registered once:
+
+```ts
+// src/characters/index.ts
+export const CHARACTERS = {
+  survivor_alex: survivorAlex,
+  scout_maya: scoutMaya,
+  commander_viktor: commanderViktor,
+  engineer_noa: engineerNoa,
+} as const satisfies Record<string, CharacterPreset>;
+```
+
+```tsx
+<Character
+  x={332}
+  y={1732}
+  {...characterProps("survivor_alex", {
+    lookAt: { x: 752, y: 1006 },       // scene coordinates, not screen
+    armPose: "explain",
+    bodyPosture: "lean-forward",
+    isListening: isSpeaking("char2", globalFrame),
+    voiceAmplitude: voiceAmplitude("char1", globalFrame),
+  })}
+/>
+```
+
+**Ask the agent for a new hero** — it will create `src/characters/<role>_<name>.ts`, register it
+and place it in the scene:
+
+> «Додай героя `medic_oleg` — рудий пучок, круглі окуляри, оливковий комбінезон
+> і медичний рюкзак. Постав його в medium-шот, дай погляд на Alex і реакцію-кивки,
+> коли говорить Maya.»
+
+Full step-by-step recipe: [`AGENTS.md` §2.11](./AGENTS.md#211-модульний-реєстр-персонажів-srccharacters).
+
 
 ### Use it with OpenCode / Claude Code
 
@@ -167,7 +226,7 @@ for a change in plain language and the agent will follow `AGENTS.md`.
    claude
    ```
 
-3. The Popsikos2DAnimations skill activates on any location, render, audio or
+3. The Popsikos2DAnimations skill activates on any character, location, render, audio or
    typography request; `AGENTS.md` carries the authoritative rules.
 
 ### Generate a whole episode with one prompt
@@ -182,6 +241,7 @@ What the agent does under the hood (defined in `AGENTS.md`):
 
 | Step | Command / file |
 |---|---|
+| New character | `src/characters/<role>_<name>.ts` → registered in `src/characters/index.ts` |
 | New location | `src/locations/<name>/` → registered in `src/locations/index.ts` |
 | New sound | function + `library` entry in `generate_sfx.py` → `python generate_sfx.py` → row in `SOUNDS.md` |
 | New dialogue | `public/voices/NN_speaker.wav` → `python build_dialogue.py` |
@@ -191,6 +251,9 @@ What the agent does under the hood (defined in `AGENTS.md`):
 ### Notes
 
 - Every visual is SVG/React — no 3D, no raster assets.
+- Characters are actors: arm poses, posture, gaze targeting, blinks and listening nods are
+  deterministic (`rand(seed, i)` + frame-based `sin`), and mouths follow real voice amplitude.
+- Heroes are modular presets (`src/characters/`); a new look never requires a new rig.
 - Sound is synthesised from noise and oscillators, then cleaned and limited with ffmpeg.
 - Text uses local heavy fonts (Arial Black / Segoe UI Black / Impact) with a layered
   stroke + gradient fill, so Ukrainian glyphs render without network access.
@@ -259,11 +322,16 @@ src/
 ├─ Root.tsx            реєстрація композиції (1080x1920, 30 fps, DURATION)
 ├─ MainScene.tsx      вісім шотів, камера, грейд, аудіомікс, титри
 ├─ ShotEngine.tsx      8 кінематографічних типів шотів + plate/ефекти
-├─ Character.tsx       SVG-маріонетка: 4 типи очей, 5 ротів, дихання, мова
+├─ Character.tsx       SVG-актор: очі, роти, дихання + 5 поз рук, постава,
+│                      погляд на ціль, авто-моргання, кивки, амплітуда голосу
+├─ characters/
+│  ├─ types.ts         контракт CharacterPreset / CharacterLook
+│  ├─ index.ts         реєстр: CHARACTERS, CharacterId, characterProps()
+│  └─ *.ts             survivor_alex, scout_maya, commander_viktor, engineer_noa
 ├─ TextOverlays.tsx    HookTitle + DynamicCaption (spring, comic-обводка)
 ├─ Camera.tsx          паралакс Layer, тип Camera, детермінований random
 ├─ palette.ts          кольори + константи кадру
-├─ dialogueTimeline.ts згенеровані діалоги та огинаючі мовлення
+├─ dialogueTimeline.ts згенеровані діалоги та огинаючі + voiceAmplitude()
 └─ locations/
    ├─ types.ts         контракт LocationDefinition
    ├─ index.ts         реєстр: LOCATIONS, LocationId, getLocation()
@@ -336,6 +404,59 @@ import { CinematicShot } from "./ShotEngine";
 `computeShot({ type, durationInFrames, frame, target, motion, shake })` — чистий
 солвер. Повний API, пресети й граблі: [`AGENTS.md` §2.9](./AGENTS.md#29-cinematic-shot-engine-srcshotenginetsx).
 
+### Акторська гра та реєстр героїв
+
+`src/Character.tsx` — повноцінний SVG-актор: кожен параметр гри **опційний**, тому старі
+сцени рендеряться без змін.
+
+| Prop | Значення | Що робить |
+|---|---|---|
+| `armPose` | `idle`, `shock`, `explain`, `point`, `crossed` | п'ять авторських поз рук: плече → лікоть → зап'ясток однією плавною кривою, контур 3 px |
+| `bodyPosture` | `neutral`, `lean-forward`, `recoil`, `slumped` | нахил, просідання й стиснення корпусу навколо таза |
+| `headTilt` | градуси | додатковий нахил голови поверх живих мікрорухів |
+| `lookAt` | `{ x, y }` у **координатах сцени** | персонаж сам рахує вектор і повертає зіниці (плюс легкий поворот голови) у той бік |
+| `isListening` | `boolean` | детерміновані легкі кивки кожні ~2.5 с, поки говорить співрозмовник |
+| `voiceAmplitude` | `0..1` | безперервний морф рота `closed → half → scream`; бери `voiceAmplitude(speaker, frame)` |
+| `seed` | `number` | унікальний малюнок моргань / кивків / дрейфу погляду (жодного `Math.random()`) |
+
+Пропси зовнішності (`hairStyle`, `glasses`, `hood`, `backpack`, `beard`, `accentColor`)
+роблять із тієї самої маріонетки іншого героя без дублювання рига.
+
+Герої живуть у `src/characters/` як маленькі пресети й реєструються один раз:
+
+```ts
+// src/characters/index.ts
+export const CHARACTERS = {
+  survivor_alex: survivorAlex,
+  scout_maya: scoutMaya,
+  commander_viktor: commanderViktor,
+  engineer_noa: engineerNoa,
+} as const satisfies Record<string, CharacterPreset>;
+```
+
+```tsx
+<Character
+  x={332}
+  y={1732}
+  {...characterProps("survivor_alex", {
+    lookAt: { x: 752, y: 1006 },       // координати сцени, не екрана
+    armPose: "explain",
+    bodyPosture: "lean-forward",
+    isListening: isSpeaking("char2", globalFrame),
+    voiceAmplitude: voiceAmplitude("char1", globalFrame),
+  })}
+/>
+```
+
+**Попроси агента створити героя** — він зробить `src/characters/<role>_<name>.ts`,
+зареєструє й поставить у сцену:
+
+> «Додай героя `medic_oleg` — рудий пучок, круглі окуляри, оливковий комбінезон
+> і медичний рюкзак. Постав його в medium-шот, дай погляд на Alex і реакцію-кивки,
+> коли говорить Maya.»
+
+Покроковий рецепт: [`AGENTS.md` §2.11](./AGENTS.md#211-модульний-реєстр-персонажів-srccharacters).
+
 
 ### Робота в OpenCode / Claude Code
 
@@ -369,7 +490,7 @@ import { CinematicShot } from "./ShotEngine";
    claude
    ```
 
-3. Скіл Popsikos2DAnimations активується на будь-який запит щодо локацій,
+3. Скіл Popsikos2DAnimations активується на будь-який запит щодо персонажів, локацій,
    рендера, звуку чи титрів; істина правил — в `AGENTS.md`.
 
 ### Ціла серія однією командою
@@ -384,6 +505,7 @@ import { CinematicShot } from "./ShotEngine";
 
 | Крок | Команда / файл |
 |---|---|
+| Новий герой | `src/characters/<role>_<name>.ts` → реєстрація в `src/characters/index.ts` |
 | Нова локація | `src/locations/<name>/` → реєстрація в `src/locations/index.ts` |
 | Новий звук | функція + запис у `library` в `generate_sfx.py` → `python generate_sfx.py` → рядок у `SOUNDS.md` |
 | Нова озвучка | `public/voices/NN_speaker.wav` → `python build_dialogue.py` |
@@ -393,6 +515,9 @@ import { CinematicShot } from "./ShotEngine";
 ### Нотатки
 
 - Уся графіка — SVG/React; без 3D і без растрових ассетів.
+- Персонажі — актори: пози рук, постава, погляд, моргання й кивки детерміновані
+  (`rand(seed, i)` + `sin` від кадру), а рот слідує за реальною амплітудою голосу.
+- Герої — модульні пресети (`src/characters/`); новий вигляд не потребує нового рига.
 - Звук синтезований із шуму й осциляторів, потім очищений і обмежений через ffmpeg.
 - Титри — локальні важкі шрифти (Arial Black / Segoe UI Black / Impact) зі
   стекованою обводкою та градієнтом, тому українські гліфи рендеряться без мережі.

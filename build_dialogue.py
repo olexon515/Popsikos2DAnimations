@@ -10,6 +10,7 @@ Scans public/voices/ for files named <NN>_<speaker>.<ext> (01_narrator.mp3,
   * DIALOGUE           - ordered lines: startFrame, durationInFrames, speaker, file
   * ENVELOPES          - one 0/1 speech envelope per speaker on the global clock
   * isSpeaking()       - helper used by the shots for lip-sync
+  * voiceAmplitude()   - smooth 0..1 loudness for advanced mouth shapes
   * HAS_DIALOGUE       - false when public/voices/ is empty
 
 The envelopes are measured from the audio itself (RMS per frame, thresholded and
@@ -288,6 +289,35 @@ def write_ts(
     )
     out.append("  if (!envelope) return false;")
     out.append("  return envelope[Math.round(frame)] === 1;")
+    out.append("};")
+    out.append("")
+    out.append("/**")
+    out.append(" * 0..1 voice loudness on the global frame - feed it straight into")
+    out.append(" * `<Character voiceAmplitude={...} />` for a smooth closed -> half -> scream mouth.")
+    out.append(" *")
+    out.append(" * The 0/1 envelope is windowed (2 frames each side) and modulated with a")
+    out.append(" * syllabic flutter. Fully deterministic: `Math.sin` only, no `Math.random()`.")
+    out.append(" */")
+    out.append("export const voiceAmplitude = (speaker: string, frame: number): number => {")
+    out.append(
+        "  const envelope = (ENVELOPES as Record<string, readonly number[] | undefined>)[speaker];"
+    )
+    out.append("  if (!envelope || envelope.length === 0) return 0;")
+    out.append("  const f = Math.round(frame);")
+    out.append("  let loud = 0;")
+    out.append("  let weight = 0;")
+    out.append("  for (let d = -2; d <= 2; d += 1) {")
+    out.append("    const i = f + d;")
+    out.append("    if (i < 0 || i >= envelope.length) continue;")
+    out.append("    const w = 1 - Math.abs(d) / 3;")
+    out.append("    weight += w;")
+    out.append("    if (envelope[i] === 1) loud += w;")
+    out.append("  }")
+    out.append("  if (weight === 0) return 0;")
+    out.append("  const base = loud / weight;")
+    out.append("  if (base < 0.08) return 0;")
+    out.append("  const flutter = 0.6 + 0.4 * Math.abs(Math.sin(f * 0.85 + 0.6));")
+    out.append("  return Math.min(1, base * flutter);")
     out.append("};")
     out.append("")
 
