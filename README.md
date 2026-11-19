@@ -10,7 +10,10 @@ automatic lip-sync, comic-style Ukrainian typography — plus a **modular locati
 (`src/locations/`), an **Interactive Prop Engine** with nine stateful SVG objects
 (`src/props/`), a **Cinematic Shot Engine** with 8 ready-made shot types
 (`src/ShotEngine.tsx`) and **advanced character acting** with a modular cast registry
-(`src/characters/`), so you can build new places, new props, new heroes and new camera work with an AI agent.
+(`src/characters/`), plus a **config-driven Infographic & UI Engine** with seven SVG
+components (`src/infographics/`: tactical map, resource markers, counters, schematics,
+inventory HUD, warning banner, animated routes) — so you can build new places, new props,
+new heroes, new HUD panels and new camera work with an AI agent.
 
 - [English](#english)
 - [Українською](#українською)
@@ -77,6 +80,12 @@ src/
 │  ├─ shared.tsx       usePropFrame(), loopPhase(), pulse(), PROP_OUTLINE
 │  └─ *.tsx            phone, generator, radio, faucet, pump, tanks, door,
 │                      notebook, tools — each with its own states
+├─ infographics/
+│  ├─ types.ts         InfographicPlacement + 7 config types, InfographicProps union
+│  ├─ index.ts         registry: INFOGRAPHICS, typed <Infographic id config/>
+│  ├─ shared.tsx       InfoSvg, useInfoClock, springs, palette INFO
+│  └─ *.tsx            procedural_map, resource_markers, counters, schematics,
+│                      inventory, warning, animated_routes
 ├─ TextOverlays.tsx    HookTitle + DynamicCaption (spring, comic outline)
 ├─ Camera.tsx          parallax Layer, camera type, deterministic random
 ├─ palette.ts          colours + frame constants
@@ -258,6 +267,53 @@ comes from `seed` + `rand(seed, i)`: no `Math.random()` anywhere.
 
 Full step-by-step recipe: [`AGENTS.md` §2.12](./AGENTS.md#212-interactive-prop-engine-srcprops).
 
+### Infographics & UI engine
+
+`src/infographics/` is the fourth modular registry: seven config-driven SVG components
+for HUD panels, schematics and tactical plates. Every component animates purely from the
+Remotion frame (`useInfoClock`, `enterSpring`, `rand(seed, i)`), draws a 3 px ink outline
+with heavy Ukrainian display type, and takes normalized 0..1 coordinates, so one config
+works at any artboard size. The same component works as a screen-space HUD (mount it after
+`</World>`) or as a printed layer inside the map plate (mount it inside
+`<Layer camera={camera} depth={0.45}>`).
+
+| `id` | Component | What it draws | Demo |
+|---|---|---|---|
+| `procedural_map` | `ProceduralMap` | procedural tactical map: grid, blocks, zones, radar/line scan, routes, compass | `map` (plate) |
+| `resource_markers` | `ResourceMarkers` | water / fuel / power / med / radiation pins with readings and ok / low / critical status | `map` (plate) |
+| `counters` | `Counters` | digital / bar / radial meters with staggered entry and animated count-up | `medium` (HUD) |
+| `schematics` | `Schematics` | power / water node graph with animated flow and a fault break | `object-focus` (HUD) |
+| `inventory` | `InventoryHUD` | character inventory grid: 12 icons, quantities, active slot, durability bars | `wide` (HUD) |
+| `warning` | `WarningBanner` | caution / danger / critical banner with hazard stripes and beacon | `object-focus` (HUD) |
+| `animated_routes` | `AnimatedRoutes` | routes drawn point-by-point, moving arrow heads, waypoints, callouts | `map` (plate) |
+
+```tsx
+import { Infographic } from "./infographics";
+import type { CountersConfig } from "./infographics";
+
+const RESOURCE_METERS: CountersConfig = {
+  x: 560, y: 120, width: 466, height: 470,
+  title: "РЕСУРСИ ГРУПИ",
+  startFrame: 12, stagger: 6, duration: 52,
+  items: [
+    { label: "ВОДА", from: 0, to: 62, unit: "%", variant: "digital", max: 100, color: "#5AC8FF" },
+    { label: "ПАЛИВО", from: 0, to: 18, unit: "%", variant: "bar", max: 100, color: "#FFB01F", critical: true },
+    { label: "ЖИВЛЕННЯ", from: 0, to: 72, unit: "%", variant: "radial", max: 100, color: "#FFE066" },
+  ],
+};
+
+// HUD: mount after </World>; plate: mount inside <Layer camera={camera} depth={0.45}>
+<Infographic id="counters" config={RESOURCE_METERS} />
+```
+
+**Ask the agent for a new infographic** — it will create `src/infographics/<Name>.tsx`,
+add the config type to `InfographicConfigMap`, register the id in `INFOGRAPHICS` and
+place it in the scene:
+
+> «Додай інфографіку `weather_front` — детермінований фронт із хмарами, HUD у upper-left.»
+
+Full step-by-step recipe: [`AGENTS.md` §2.13](./AGENTS.md#213-infographic--ui-engine-srcinfographics).
+
 ### Automatic voice-over with ElevenLabs
 
 `generate_voices.py` turns a plain text script into the dialogue track — no extra Python
@@ -363,6 +419,7 @@ What the agent does under the hood (defined in `AGENTS.md`):
 |---|---|
 | New character | `src/characters/<role>_<name>.ts` → registered in `src/characters/index.ts` |
 | New prop | `src/props/<id>.tsx` → registered in `src/props/index.ts` → placed with `<Prop id=…>` |
+| New infographic | `src/infographics/<Name>.tsx` → config type in `InfographicConfigMap` → registered in `INFOGRAPHICS` → placed with `<Infographic id=…>` |
 | New location | `src/locations/<name>/` → registered in `src/locations/index.ts` |
 | New sound | function + `library` entry in `generate_sfx.py` → `python generate_sfx.py` → row in `SOUNDS.md` |
 | New dialogue | `script_voices.json` → `python generate_voices.py` (ElevenLabs) or drop `public/voices/NN_speaker.mp3` → `python build_dialogue.py` |
@@ -377,6 +434,8 @@ What the agent does under the hood (defined in `AGENTS.md`):
 - Heroes are modular presets (`src/characters/`); a new look never requires a new rig.
 - Props are modular too (`src/props/`): each one has typed states, an `eventProgress` beat
   and a computed `interactionPoint` for `lookAt` and `object-focus`.
+- Infographics are config-driven and deterministic (`src/infographics/`): seven components
+  that work both as screen-space HUD and as map-plate layers, animated by frame only.
 - Sound is synthesised from noise and oscillators, then cleaned and limited with ffmpeg.
 - Voice-over is generated by `generate_voices.py` (ElevenLabs, stdlib only); the API key
   lives in a gitignored `.env`, never in the repo.
@@ -468,6 +527,12 @@ src/
 │  ├─ shared.tsx       usePropFrame(), loopPhase(), pulse(), PROP_OUTLINE
 │  └─ *.tsx            phone, generator, radio, faucet, pump, tanks, door,
 │                      notebook, tools — кожен зі своїми станами
+├─ infographics/
+│  ├─ types.ts         InfographicPlacement + 7 конфіґ-типів, union InfographicProps
+│  ├─ index.ts         реєстр: INFOGRAPHICS, типовий <Infographic id config/>
+│  ├─ shared.tsx       InfoSvg, useInfoClock, спринги, палітра INFO
+│  └─ *.tsx            procedural_map, resource_markers, counters, schematics,
+│                      inventory, warning, animated_routes
 ├─ TextOverlays.tsx    HookTitle + DynamicCaption (spring, comic-обводка)
 ├─ Camera.tsx          паралакс Layer, тип Camera, детермінований random
 ├─ palette.ts          кольори + константи кадру
@@ -649,6 +714,53 @@ const GENERATOR_FOCUS = getPropInteractionPoint("generator", GENERATOR_SPOT);
 
 Покроковий рецепт: [`AGENTS.md` §2.12](./AGENTS.md#212-interactive-prop-engine-srcprops).
 
+### Інфографіка та UI-рушій
+
+`src/infographics/` — четвертий модульний реєстр: сім конфігуровних SVG-компонентів
+для HUD-панелей, схем і тактичних плит. Кожен компонент анімується **тільки від кадру**
+(`useInfoClock`, `enterSpring`, `rand(seed, i)`), малює контур **3 px** і важкий
+український дисплейний шрифт, а координати пінів/вузлів/маршрутів — нормовані 0..1,
+тому один конфіг працює при будь-якому розмірі артборду. Один і той самий компонент
+живе і як screen-space HUD (монтуй після `</World>`), і як шар плівки всередині карти
+(монтуй всередині `<Layer camera={camera} depth={0.45}>`).
+
+| `id` | Компонент | Що малює | Демо |
+|---|---|---|---|
+| `procedural_map` | `ProceduralMap` | процедурна тактична карта: сітка, райони, зони, radar/line-скан, маршрути, компас | `map` (плівка) |
+| `resource_markers` | `ResourceMarkers` | піни water/fuel/power/med/radiation зі значеннями і статусом ok/low/critical | `map` (плівка) |
+| `counters` | `Counters` | лічильники digital/bar/radial зі stagger-входом і анімованим відліком | `medium` (HUD) |
+| `schematics` | `Schematics` | схема живлення: вузли, анімовані потоки power/water, аварійний розрив | `object-focus` (HUD) |
+| `inventory` | `InventoryHUD` | інвентар: 12 іконок, к-сть, активний слот, бари стану | `wide` (HUD) |
+| `warning` | `WarningBanner` | плашка caution/danger/critical: hazard-смуги, маячок, код ALERT | `object-focus` (HUD) |
+| `animated_routes` | `AnimatedRoutes` | маршрути з поступовим малюванням, рухома стрілка, waypoints, callout-лідери | `map` (плівка) |
+
+```tsx
+import { Infographic } from "./infographics";
+import type { CountersConfig } from "./infographics";
+
+const RESOURCE_METERS: CountersConfig = {
+  x: 560, y: 120, width: 466, height: 470,
+  title: "РЕСУРСИ ГРУПИ",
+  startFrame: 12, stagger: 6, duration: 52,
+  items: [
+    { label: "ВОДА", from: 0, to: 62, unit: "%", variant: "digital", max: 100, color: "#5AC8FF" },
+    { label: "ПАЛИВО", from: 0, to: 18, unit: "%", variant: "bar", max: 100, color: "#FFB01F", critical: true },
+    { label: "ЖИВЛЕННЯ", from: 0, to: 72, unit: "%", variant: "radial", max: 100, color: "#FFE066" },
+  ],
+};
+
+// HUD: монтуй після </World>; плівка: всередині <Layer camera={camera} depth={0.45}>
+<Infographic id="counters" config={RESOURCE_METERS} />
+```
+
+**Попроси агента створити інфографіку** — він зробить `src/infographics/<Name>.tsx`,
+додасть конфіґ-тип у `InfographicConfigMap`, зареєструє `id` у `INFOGRAPHICS` і поставить
+у сцену:
+
+> «Додай інфографіку `weather_front` — детермінований фронт із хмарами, HUD у upper-left.»
+
+Повний покроковий рецепт: [`AGENTS.md` §2.13](./AGENTS.md#213-infographic--ui-engine-srcinfographics).
+
 ### Авто-озвучка через ElevenLabs
 
 `generate_voices.py` перетворює звичайний текстовий сценарій на готову дорожку діалогів —
@@ -756,6 +868,7 @@ python generate_voices.py
 |---|---|
 | Новий герой | `src/characters/<role>_<name>.ts` → реєстрація в `src/characters/index.ts` |
 | Новий проп | `src/props/<id>.tsx` → реєстрація в `src/props/index.ts` → постановка через `<Prop id=…>` |
+| Нова інфографіка | `src/infographics/<Name>.tsx` → конфіґ-тип у `InfographicConfigMap` → реєстрація в `INFOGRAPHICS` → постановка через `<Infographic id=…>` |
 | Нова локація | `src/locations/<name>/` → реєстрація в `src/locations/index.ts` |
 | Новий звук | функція + запис у `library` в `generate_sfx.py` → `python generate_sfx.py` → рядок у `SOUNDS.md` |
 | Нова озвучка | `script_voices.json` → `python generate_voices.py` (ElevenLabs) або поклади `public/voices/NN_speaker.mp3` → `python build_dialogue.py` |
@@ -770,6 +883,8 @@ python generate_voices.py
 - Герої — модульні пресети (`src/characters/`); новий вигляд не потребує нового рига.
 - Пропи теж модульні (`src/props/`): у кожного типізовані стани, подія `eventProgress`
   та обчислена точка `interactionPoint` для `lookAt` і `object-focus`.
+- Інфографіка конфігурована і детермінована (`src/infographics/`): сім компонентів,
+  що працюють і як screen-space HUD, і як шари плівки карти, анімація лише від кадру.
 - Звук синтезований із шуму й осциляторів, потім очищений і обмежений через ffmpeg.
 - Озвучку генерує `generate_voices.py` (ElevenLabs, лише stdlib); ключ API живе в
   gitignored `.env` і ніколи не потрапляє в репозиторій.

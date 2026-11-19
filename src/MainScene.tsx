@@ -15,12 +15,21 @@ import { DURATION, HEIGHT, PALETTE, WIDTH } from "./palette";
 import {
   CinematicShot,
   ShotType,
-  TacticalMap,
   TopDownPlate,
 } from "./ShotEngine";
 import { DynamicCaption, HookTitle } from "./TextOverlays";
 import { DEFAULT_LOCATION, LocationId, getLocation } from "./locations";
 import { Prop, getPropInteractionPoint } from "./props";
+import { Infographic } from "./infographics";
+import type {
+  AnimatedRoutesConfig,
+  CountersConfig,
+  InventoryConfig,
+  ProceduralMapConfig,
+  ResourceMarkersConfig,
+  SchematicsConfig,
+  WarningConfig,
+} from "./infographics";
 
 /* ------------------------------------------------------------------ */
 /* Timeline: eight shots, one per cinematic preset                     */
@@ -146,6 +155,277 @@ const DOOR_SPOT = {
 } as const;
 
 /* ------------------------------------------------------------------ */
+/* Infographic & UI Engine demo configs                                */
+/* Screen-space HUD -> mounted after <World>; plate -> mounted inside  */
+/* <Layer camera depth>. Every config is typed by the registry.        */
+/* ------------------------------------------------------------------ */
+
+const ALEX_INVENTORY: InventoryConfig = {
+  x: 700,
+  y: 88,
+  width: 346,
+  height: 600,
+  title: "ІНВЕНТАР",
+  owner: "ALEX",
+  columns: 2,
+  compact: true,
+  showHints: true,
+  delay: 6,
+  slots: [
+    {
+      name: "АПТЕЧКА",
+      icon: "medkit",
+      qty: 2,
+      active: true,
+      hint: "АКТИВНИЙ СЛОТ",
+      durability: 0.82,
+    },
+    { name: "ВОДА", icon: "water", qty: 4 },
+    { name: "ПАЛИВО", icon: "fuel", qty: 1, durability: 0.35 },
+    { name: "НАБОЇ", icon: "ammo", qty: 24 },
+    { name: "РАЦІЯ", icon: "radio", qty: 1 },
+    { name: "БАТАРЕЯ", icon: "battery", qty: 3, durability: 0.6 },
+  ],
+};
+
+const RESOURCE_METERS: CountersConfig = {
+  x: 560,
+  y: 120,
+  width: 466,
+  height: 470,
+  title: "РЕСУРСИ ГРУПИ",
+  startFrame: 12,
+  stagger: 6,
+  duration: 52,
+  items: [
+    {
+      label: "ВОДА",
+      from: 0,
+      to: 62,
+      unit: "%",
+      variant: "digital",
+      max: 100,
+      color: "#5AC8FF",
+    },
+    {
+      label: "ПАЛИВО",
+      from: 0,
+      to: 18,
+      unit: "%",
+      variant: "bar",
+      max: 100,
+      color: "#FFB01F",
+      critical: true,
+    },
+    {
+      label: "ЖИВЛЕННЯ",
+      from: 0,
+      to: 72,
+      unit: "%",
+      variant: "radial",
+      max: 100,
+      color: "#FFE066",
+    },
+  ],
+};
+
+const WARNING_OVERHEAT: WarningConfig = {
+  x: 54,
+  y: 170,
+  width: 972,
+  height: 176,
+  level: "danger",
+  title: "ПЕРЕГРІВ ГЕНЕРАТОРА",
+  subtitle: "ТИСК 4.8 БАР · РОЗРИВ ЛІНІЇ 02",
+  code: "ALERT-07",
+  delay: 8,
+};
+
+const POWER_SCHEMATICS: SchematicsConfig = {
+  x: 54,
+  y: 380,
+  width: 620,
+  height: 430,
+  seed: 41,
+  title: "СХЕМА ЖИВЛЕННЯ",
+  subtitle: "ГЕНЕРАТОР · НАСОС · РЕЗЕРВУАР",
+  flowSpeed: 1,
+  nodes: [
+    {
+      id: "gen",
+      label: "ГЕНЕРАТОР",
+      kind: "generator",
+      x: 0.11,
+      y: 0.2,
+      value: "3.2 кВт",
+    },
+    {
+      id: "shield",
+      label: "ЩИТ",
+      kind: "junction",
+      x: 0.42,
+      y: 0.2,
+      value: "220 В",
+    },
+    {
+      id: "pump",
+      label: "НАСОС",
+      kind: "pump",
+      x: 0.78,
+      y: 0.2,
+      value: "4.8 бар",
+      status: "fault",
+    },
+    {
+      id: "tank",
+      label: "РЕЗЕРВУАР",
+      kind: "tank",
+      x: 0.78,
+      y: 0.72,
+      value: "62 %",
+    },
+    {
+      id: "light",
+      label: "СВІТЛО",
+      kind: "load",
+      x: 0.18,
+      y: 0.72,
+      value: "OFF",
+      status: "off",
+    },
+  ],
+  links: [
+    { from: "gen", to: "shield", type: "power" },
+    { from: "shield", to: "pump", type: "power", fault: true, label: "ЛІНІЯ 02" },
+    { from: "pump", to: "tank", type: "water" },
+    { from: "shield", to: "light", type: "power" },
+  ],
+};
+
+const MAP_PLATE: ProceduralMapConfig = {
+  seed: 7,
+  x: 0,
+  y: 0,
+  width: 1080,
+  height: 1920,
+  title: "СЕКТОР 07",
+  subtitle: "ТАКТИЧНА КАРТА · ЖИВА МЕРЕЖА",
+  grid: 90,
+  blocks: 16,
+  zones: 4,
+  scan: "radar",
+  radarSpeed: 1.4,
+  labels: ["ПІВНІЧНИЙ КВАРТАЛ", "СТАРИЙ ЗАВОД", "РІЧКОВИЙ ПОРТ"],
+  routes: [
+    {
+      points: [
+        { x: 0.1, y: 0.82 },
+        { x: 0.26, y: 0.7 },
+        { x: 0.38, y: 0.56 },
+        { x: 0.52, y: 0.47 },
+      ],
+      color: "#5BE7A9",
+      label: "КОРИДОР",
+    },
+  ],
+};
+
+const MAP_ROUTES: AnimatedRoutesConfig = {
+  x: 0,
+  y: 0,
+  width: 1080,
+  height: 1920,
+  showGrid: false,
+  routes: [
+    {
+      points: [
+        { x: 0.12, y: 0.84 },
+        { x: 0.24, y: 0.74 },
+        { x: 0.34, y: 0.62 },
+        { x: 0.44, y: 0.52 },
+        { x: 0.55, y: 0.47 },
+        { x: 0.58, y: 0.4 },
+      ],
+      color: "#FFB01F",
+      label: "МАРШРУТ А",
+      note: "ПІВНІЧНИЙ КОРИДОР · 860 М",
+      startFrame: 10,
+      drawDuration: 58,
+    },
+    {
+      points: [
+        { x: 0.86, y: 0.86 },
+        { x: 0.78, y: 0.72 },
+        { x: 0.7, y: 0.58 },
+        { x: 0.62, y: 0.5 },
+        { x: 0.56, y: 0.46 },
+      ],
+      color: "#5BE7A9",
+      label: "МАРШРУТ Б",
+      note: "ОБХІД ЗАВАЛУ · 1240 М",
+      startFrame: 20,
+      drawDuration: 54,
+      dash: true,
+    },
+  ],
+};
+
+const MAP_RESOURCES: ResourceMarkersConfig = {
+  x: 0,
+  y: 0,
+  width: 1080,
+  height: 1920,
+  markerScale: 1.1,
+  markers: [
+    {
+      x: 0.84,
+      y: 0.2,
+      type: "power",
+      label: "ПІДСТАНЦІЯ",
+      value: 0,
+      unit: "%",
+      status: "critical",
+    },
+    {
+      x: 0.66,
+      y: 0.6,
+      type: "water",
+      label: "РЕЗЕРВУАР 3",
+      value: 62,
+      unit: "%",
+      status: "ok",
+    },
+    {
+      x: 0.26,
+      y: 0.36,
+      type: "fuel",
+      label: "ПАЛИВО B2",
+      value: 18,
+      unit: "%",
+      status: "low",
+    },
+    {
+      x: 0.15,
+      y: 0.55,
+      type: "med",
+      label: "МЕДПУНКТ",
+      value: 42,
+      unit: "%",
+      status: "low",
+    },
+    {
+      x: 0.52,
+      y: 0.72,
+      type: "radiation",
+      label: "ЗОНА Р-4",
+      value: 820,
+      unit: "мкР/г",
+      status: "critical",
+    },
+  ],
+};
+
+/* ------------------------------------------------------------------ */
 /* World: location layers + actors, with optional depth-of-field blur  */
 /* ------------------------------------------------------------------ */
 
@@ -233,51 +513,55 @@ const ShotWide: React.FC<{
       const alexTalking = isSpeaking("char1", g);
       const mayaTalking = isSpeaking("char2", g);
       return (
-        <World camera={camera} location={location}>
-          {/* Environmental props. They sit behind the actors; the phone is the
-              target Maya glances at whenever she is not speaking. */}
-          <Prop id="tanks" {...TANKS_SPOT} />
-          <Prop id="phone" {...PHONE_SPOT} />
-          {/* Viktor keeps the group honest: crossed arms, watching both of them. */}
-          <Character
-            x={176}
-            y={1642}
-            {...characterProps("commander_viktor", {
-              scale: 1.0,
-              armPose: "crossed",
-              lookAt: { x: 540, y: 1174 },
-              isListening: alexTalking || mayaTalking,
-            })}
-          />
-          {/* Alex explains with an open palm while his eyes flick to Maya. */}
-          <Character
-            x={540}
-            y={1674}
-            {...characterProps("survivor_alex", {
-              scale: 1.04,
-              armPose: alexTalking ? "explain" : "idle",
-              bodyPosture: alexTalking ? "lean-forward" : "neutral",
-              lookAt: { x: 880, y: 1170 },
-              isTalking: alexTalking,
-              isListening: !alexTalking && mayaTalking,
-              voiceAmplitude: voiceAmplitude("char1", g),
-            })}
-          />
-          {/* Maya points at the horizon, then reacts to Alex's line. When the
-              dialogue pauses she looks down at the prop interactionPoint. */}
-          <Character
-            x={880}
-            y={1654}
-            {...characterProps("scout_maya", {
-              scale: 1.0,
-              armPose: mayaTalking ? "point" : "idle",
-              lookAt: mayaTalking ? { x: 540, y: 1170 } : PHONE_FOCUS,
-              isTalking: mayaTalking,
-              isListening: alexTalking,
-              voiceAmplitude: voiceAmplitude("char2", g),
-            })}
-          />
-        </World>
+        <>
+          <World camera={camera} location={location}>
+            {/* Environmental props. They sit behind the actors; the phone is the
+                target Maya glances at whenever she is not speaking. */}
+            <Prop id="tanks" {...TANKS_SPOT} />
+            <Prop id="phone" {...PHONE_SPOT} />
+            {/* Viktor keeps the group honest: crossed arms, watching both of them. */}
+            <Character
+              x={176}
+              y={1642}
+              {...characterProps("commander_viktor", {
+                scale: 1.0,
+                armPose: "crossed",
+                lookAt: { x: 540, y: 1174 },
+                isListening: alexTalking || mayaTalking,
+              })}
+            />
+            {/* Alex explains with an open palm while his eyes flick to Maya. */}
+            <Character
+              x={540}
+              y={1674}
+              {...characterProps("survivor_alex", {
+                scale: 1.04,
+                armPose: alexTalking ? "explain" : "idle",
+                bodyPosture: alexTalking ? "lean-forward" : "neutral",
+                lookAt: { x: 880, y: 1170 },
+                isTalking: alexTalking,
+                isListening: !alexTalking && mayaTalking,
+                voiceAmplitude: voiceAmplitude("char1", g),
+              })}
+            />
+            {/* Maya points at the horizon, then reacts to Alex's line. When the
+                dialogue pauses she looks down at the prop interactionPoint. */}
+            <Character
+              x={880}
+              y={1654}
+              {...characterProps("scout_maya", {
+                scale: 1.0,
+                armPose: mayaTalking ? "point" : "idle",
+                lookAt: mayaTalking ? { x: 540, y: 1170 } : PHONE_FOCUS,
+                isTalking: mayaTalking,
+                isListening: alexTalking,
+                voiceAmplitude: voiceAmplitude("char2", g),
+              })}
+            />
+          </World>
+          {/* Screen-space HUD: mounted after <World>, so it does not parallax. */}
+          <Infographic id="inventory" config={ALEX_INVENTORY} />
+        </>
       );
     }}
   </CinematicShot>
@@ -306,44 +590,48 @@ const ShotMedium: React.FC<{
       const alexTalking = isSpeaking("char1", g);
       const mayaTalking = isSpeaking("char2", g);
       return (
-        <World camera={camera} location={location} backgroundBlur={1.4}>
-          {/* Working pump, a hissing radio and an open field journal frame
-              the dialogue. When nobody talks Alex glances at the journal. */}
-          <Prop id="pump" {...PUMP_SPOT} />
-          <Prop id="radio" {...RADIO_SPOT} />
-          <Prop id="notebook" {...NOTEBOOK_SPOT} />
-          {/* Alex leans in and explains; while Maya talks he listens and nods. */}
-          <Character
-            x={332}
-            y={1732}
-            {...characterProps("survivor_alex", {
-              scale: 1.58,
-              armPose: alexTalking ? "explain" : "idle",
-              bodyPosture: alexTalking ? "lean-forward" : "neutral",
-              lookAt:
-                !alexTalking && !mayaTalking
-                  ? NOTEBOOK_FOCUS
-                  : { x: 750, y: 1006 },
-              isTalking: alexTalking,
-              isListening: mayaTalking,
-              voiceAmplitude: voiceAmplitude("char1", g),
-            })}
-          />
-          {/* Maya answers with a point; the rest of the time her arms are crossed. */}
-          <Character
-            x={752}
-            y={1742}
-            {...characterProps("scout_maya", {
-              scale: 1.55,
-              armPose: mayaTalking ? "point" : "crossed",
-              bodyPosture: mayaTalking ? "recoil" : "neutral",
-              lookAt: { x: 332, y: 986 },
-              isTalking: mayaTalking,
-              isListening: alexTalking,
-              voiceAmplitude: voiceAmplitude("char2", g),
-            })}
-          />
-        </World>
+        <>
+          <World camera={camera} location={location} backgroundBlur={1.4}>
+            {/* Working pump, a hissing radio and an open field journal frame
+                the dialogue. When nobody talks Alex glances at the journal. */}
+            <Prop id="pump" {...PUMP_SPOT} />
+            <Prop id="radio" {...RADIO_SPOT} />
+            <Prop id="notebook" {...NOTEBOOK_SPOT} />
+            {/* Alex leans in and explains; while Maya talks he listens and nods. */}
+            <Character
+              x={332}
+              y={1732}
+              {...characterProps("survivor_alex", {
+                scale: 1.58,
+                armPose: alexTalking ? "explain" : "idle",
+                bodyPosture: alexTalking ? "lean-forward" : "neutral",
+                lookAt:
+                  !alexTalking && !mayaTalking
+                    ? NOTEBOOK_FOCUS
+                    : { x: 750, y: 1006 },
+                isTalking: alexTalking,
+                isListening: mayaTalking,
+                voiceAmplitude: voiceAmplitude("char1", g),
+              })}
+            />
+            {/* Maya answers with a point; the rest of the time her arms are crossed. */}
+            <Character
+              x={752}
+              y={1742}
+              {...characterProps("scout_maya", {
+                scale: 1.55,
+                armPose: mayaTalking ? "point" : "crossed",
+                bodyPosture: mayaTalking ? "recoil" : "neutral",
+                lookAt: { x: 332, y: 986 },
+                isTalking: mayaTalking,
+                isListening: alexTalking,
+                voiceAmplitude: voiceAmplitude("char2", g),
+              })}
+            />
+          </World>
+          {/* Screen-space resource meters: digital + bar + radial, animated. */}
+          <Infographic id="counters" config={RESOURCE_METERS} />
+        </>
       );
     }}
   </CinematicShot>
@@ -548,36 +836,41 @@ const ShotObjectFocus: React.FC<{
     label="OBJECT · GENERATOR"
   >
     {({ camera, fx, progress }) => (
-      <World
-        camera={camera}
-        location={location}
-        backgroundBlur={fx.focusBlur}
-      >
-        {/* Noa points at the generator; `lookAt` and the camera `target` both
-            come from the prop registry interactionPoint. */}
-        <Character
-          x={214}
-          y={1780}
-          {...characterProps("engineer_noa", {
-            scale: 1.05,
-            armPose: "point",
-            bodyPosture: "lean-forward",
-            headTilt: 4,
-            lookAt: GENERATOR_FOCUS,
-            isListening: false,
-          })}
-        />
-        <Prop
-          id="generator"
-          {...GENERATOR_SPOT}
-          eventProgress={0.35 + progress * 0.65}
-        />
-        <Prop
-          id="tools"
-          {...TOOLS_SPOT}
-          eventProgress={0.4 + progress * 0.6}
-        />
-      </World>
+      <>
+        <World
+          camera={camera}
+          location={location}
+          backgroundBlur={fx.focusBlur}
+        >
+          {/* Noa points at the generator; `lookAt` and the camera `target` both
+              come from the prop registry interactionPoint. */}
+          <Character
+            x={214}
+            y={1780}
+            {...characterProps("engineer_noa", {
+              scale: 1.05,
+              armPose: "point",
+              bodyPosture: "lean-forward",
+              headTilt: 4,
+              lookAt: GENERATOR_FOCUS,
+              isListening: false,
+            })}
+          />
+          <Prop
+            id="generator"
+            {...GENERATOR_SPOT}
+            eventProgress={0.35 + progress * 0.65}
+          />
+          <Prop
+            id="tools"
+            {...TOOLS_SPOT}
+            eventProgress={0.4 + progress * 0.6}
+          />
+        </World>
+        {/* Screen-space HUD: fault banner + live power schematic. */}
+        <Infographic id="warning" config={WARNING_OVERHEAT} />
+        <Infographic id="schematics" config={POWER_SCHEMATICS} />
+      </>
     )}
   </CinematicShot>
 );
@@ -600,7 +893,10 @@ const ShotMap: React.FC<{
   >
     {({ camera }) => (
       <Layer camera={camera} depth={0.45}>
-        <TacticalMap location={location} target={{ x: 742, y: 812 }} />
+        {/* Plate + overlays share one Layer, so they parallax together. */}
+        <Infographic id="procedural_map" config={MAP_PLATE} />
+        <Infographic id="animated_routes" config={MAP_ROUTES} />
+        <Infographic id="resource_markers" config={MAP_RESOURCES} />
       </Layer>
     )}
   </CinematicShot>

@@ -1,13 +1,7 @@
 ---
 name: popsikos-2d-animations
-description: Create and edit vertical 2D cartoons with Remotion - pure SVG/React characters with advanced acting (5 arm poses, body posture, gaze targeting, auto-blinks, listening nods, voice-driven mouths), a modular character registry (src/characters/), modular parallax locations (src/locations/), an interactive prop engine (src/props/) with 9 SVG props, per-prop states, eventProgress and scene-space interactionPoint for lookAt/object-focus, an 8-type cinematic shot engine (wide, medium, closeup, extreme-closeup, top-down, POV, object-focus, map), comic-style titles, procedurally generated WAV sound design, ElevenLabs voice-over generation (generate_voices.py, eleven_flash_v2_5, key kept in a gitignored .env), lip-sync dialogue timeline and vertical 1080x1920 rendering. Universal workflow for 2D animation projects built on this template - new characters, locations, props, scenes, shots, sounds, voices, captions, lint, still-frame checks and renders.
+description: Create and edit vertical 2D cartoons with Remotion - pure SVG/React characters with advanced acting (5 arm poses, body posture, gaze targeting, auto-blinks, listening nods, voice-driven mouths), a modular character registry (src/characters/), modular parallax locations (src/locations/), an interactive prop engine (src/props/) with 9 SVG props, per-prop states, eventProgress and scene-space interactionPoint for lookAt/object-focus, an 8-type cinematic shot engine (wide, medium, closeup, extreme-closeup, top-down, POV, object-focus, map), comic-style titles, procedurally generated WAV sound design, ElevenLabs voice-over generation (generate_voices.py, eleven_flash_v2_5, key kept in a gitignored .env), lip-sync dialogue timeline and vertical 1080x1920 rendering, a config-driven infographic & UI engine (src/infographics/ with 7 SVG components: procedural map, resource markers, counters, schematics, inventory HUD, warning banner, animated routes). Universal workflow for 2D animation projects built on this template - new characters, locations, props, scenes, shots, sounds, voices, captions, lint, still-frame checks and renders.
 ---
-
-# SKILL.md — Popsikos2DAnimations
-
-> Дзеркало `AGENTS.md` для Claude Skills / OpenCode: той самий довідник Popsikos2DAnimations.
-> Якщо є розбіжності — **істина в `AGENTS.md`**, цей файл лише повторює його вміст.
-
 # AGENTS.md — Popsikos2DAnimations
 
 > Інструкція для AI-агентів (OpenCode, Claude Code тощо), які змінюють, розширюють або рендерять цей проєкт.
@@ -18,7 +12,7 @@ description: Create and edit vertical 2D cartoons with Remotion - pure SVG/React
 
 ## 0. Що це і як почати за 5 хвилин
 
-**Popsikos2DAnimations** — вертикальні 2D-мультфільми на тему апокаліпсису: **1080×1920, 30 fps**, уся графіка — SVG + React, без 3D і без растрових ассетів. Декорації винесені в модульні локації (`src/locations/`), інтерактивні предмети — в **Interactive Prop Engine** (`src/props/`: телефон, генератор, рація, кран, насос, резервуари, гермодвері, блокнот, інструменти), звук синтезований локально (`generate_sfx.py`), озвучку реплік можна згенерувати через ElevenLabs (`generate_voices.py` → `public/voices/*.mp3`), а діалоги та lip-sync — з `public/voices/` (`build_dialogue.py`), титри — CSS-текст із comic-обводкою, а 8 кінематографічних планів (wide → map) дає `src/ShotEngine.tsx`. Акторська гра (5 поз рук, постава, погляд, авто-моргання, кивки, `voiceAmplitude`) живе в `src/Character.tsx`, а готові герої — модульні пресети в `src/characters/`.
+**Popsikos2DAnimations** — вертикальні 2D-мультфільми на тему апокаліпсису: **1080×1920, 30 fps**, уся графіка — SVG + React, без 3D і без растрових ассетів. Декорації винесені в модульні локації (`src/locations/`), інтерактивні предмети — в **Interactive Prop Engine** (`src/props/`: телефон, генератор, рація, кран, насос, резервуари, гермодвері, блокнот, інструменти), HUD/схеми/карти — в **Infographic & UI Engine** (`src/infographics/`: 7 конфігуровних компонентів), звук синтезований локально (`generate_sfx.py`), озвучку реплік можна згенерувати через ElevenLabs (`generate_voices.py` → `public/voices/*.mp3`), а діалоги та lip-sync — з `public/voices/` (`build_dialogue.py`), титри — CSS-текст із comic-обводкою, а 8 кінематографічних планів (wide → map) дає `src/ShotEngine.tsx`. Акторська гра (5 поз рук, постава, погляд, авто-моргання, кивки, `voiceAmplitude`) живе в `src/Character.tsx`, а готові герої — модульні пресети в `src/characters/`.
 
 | Параметр | Значення |
 |---|---|
@@ -29,6 +23,8 @@ description: Create and edit vertical 2D cartoons with Remotion - pure SVG/React
 | Еталонна локація | `street` (`src/locations/street/`) |
 | Еталонний персонаж | `survivor_alex` (`src/characters/survivor_alex.ts`) |
 | Акторська система | `src/Character.tsx` — 5 поз рук, постава, погляд, моргання, `voiceAmplitude` (розділи 2.4, 2.10, 2.11) |
+| Інтерактивні пропи | `src/props/` — 9 SVG-предметів зі станами, `eventProgress`, seed та `interactionPoint` (розділ 2.12) |
+| Інфографіка та HUD | `src/infographics/` — 7 конфігуровних SVG-компонентів (карта, маркери, лічильники, схема, інвентар, попередження, маршрути; розділ 2.13) |
 | Фінальний рендер | `out/<назва>.mp4` (h264 + AAC 48 kHz stereo) |
 
 **Перші дії нового агента (з кореня проєкту):**
@@ -107,6 +103,32 @@ done
 
 Окремо перевіряй стики планів (`cut`): кадр `224/225`, `449/450`, `674/675`, `899/900`, `1124/1125`, `1349/1350`, `1574/1575` — не має бути щілин, стрибків віньєтки або розмиття, що лишилось від `object-focus`.
 
+Кадри для перевірки інтерактивних пропів (демо-таймлайн, `DURATION=1800`):
+
+```bash
+for f in 110 335 1235 1460; do
+  npx remotion still src/index.ts Popsikos2DAnimations out/prop-$f.png --frame=$f
+done
+```
+
+`110` — телефон + резервуари у `wide`; `335` — насос, рація й блокнот у `medium`;
+`1235` — гермодвері та кран у `pov`; `1460` — генератор + інструменти в `object-focus`
+(перевіряй, що `lookAt` інженера й `target` камери дивляться в ту саму точку пропа).
+
+Кадри для перевірки інфографіки (після змін у `src/infographics/` або демо-конфігах
+у `MainScene.tsx`) — ті самі кадри шотів, дивись лише HUD/плівку:
+
+```bash
+for f in 110 335 1460 1685; do
+  npx remotion still src/index.ts Popsikos2DAnimations out/info-$f.png --frame=$f
+done
+```
+
+`110` — `inventory` у `wide`; `335` — `counters` у `medium`; `1460` — `warning` +
+`schematics` у `object-focus`; `1685` — `procedural_map` + `animated_routes` +
+`resource_markers` у `map`. Дивись: написи не перекриваються між собою й з титрами,
+гліфи не обрізані, контур 3 px цілий, plate не «пливе» разом із камерою.
+
 ### 1.6 Перевірка готового відео
 
 ```bash
@@ -148,12 +170,16 @@ ffmpeg -v info -ss 9 -t 1 -i out/episode.mp4 -vn -af volumedetect -f null NUL 2>
 | `src/characters/types.ts` | контракт `CharacterPreset` / `CharacterLook` для модульного реєстру героїв |
 | `src/characters/index.ts` | реєстр `CHARACTERS`, тип `CharacterId`, хелпер `characterProps()` |
 | `src/characters/<preset>.ts` | готові герої: `survivor_alex`, `scout_maya`, `commander_viktor`, `engineer_noa` |
-| `src/props/types.ts` | контракт `PropDefinition` / `PropProps` / `PropLayout` / `PropPoint`, `resolvePropFocus()` |
+| `src/props/types.ts` | контракт `PropDefinition` / `PropProps` / `PropLayout`, `PropPoint` та `resolvePropFocus()` |
 | `src/props/index.ts` | реєстр `PROPS`, тип `PropId`, `<Prop>`-обгортка, `getPropInteractionPoint()` |
 | `src/props/<name>.tsx` | 9 SVG-предметів: `phone`, `generator`, `radio`, `faucet`, `pump`, `tanks`, `door`, `notebook`, `tools` |
 | `src/Camera.tsx` | тип `Camera`, компонент `Layer` (паралакс), `cameraTransform`, `rand`, `clamp`, `lerp`, `smoothstep`, `STATIC_CAMERA` |
 | `src/ShotEngine.tsx` | **Cinematic Shot Engine**: 8 пресетів (`ShotType`), `<CinematicShot>`, `TopDownPlate`, `TacticalMap` |
 | `src/TextOverlays.tsx` | `HookTitle` + `DynamicCaption` (spring, обводка, градієнт) |
+| `src/infographics/types.ts` | контракт інфографіки: `InfographicPlacement`, 7 config-типів, `InfographicConfigMap`, `InfographicProps`, `resolveInfoBox()`, `infoPoint()` |
+| `src/infographics/index.ts` | реєстр `INFOGRAPHICS`, `INFOGRAPHIC_IDS`, `getInfographic()`, типовий `<Infographic id="..." config={...} />` |
+| `src/infographics/shared.tsx` | `InfoSvg`, `useInfoClock`, `useUid`, `enterSpring`, `appear`, `progressIn`, `staggerSpring`, `formatNumber`, `textWidth`, палітра `INFO` |
+| `src/infographics/<Name>.tsx` | 7 компонентів: `ProceduralMap`, `ResourceMarkers`, `Counters`, `Schematics`, `InventoryHUD`, `WarningBanner`, `AnimatedRoutes` |
 | `src/dialogueTimeline.ts` | автогенерований таймлайн реплік і lip-sync огинаючих із `public/voices/` |
 | `src/locations/types.ts` | TypeScript-інтерфейс `LocationDefinition`, `LocationLayerProps`, `LocationSkyProps` |
 | `src/locations/index.ts` | реєстр локацій `LOCATIONS`, тип `LocationId`, `DEFAULT_LOCATION`, `getLocation()` |
@@ -188,8 +214,8 @@ ffmpeg -v info -ss 9 -t 1 -i out/episode.mp4 -vn -af volumedetect -f null NUL 2>
 | 675–899 | `extreme-closeup` | очі Maya в goggles на весь кадр | zoom 2.1→2.4, імпульс входу 7 кадрів, вібрація, grain |
 | 900–1124 | `top-down` | маківки героїв, мангал/знак/дерево зверху | plate + орбітальний `pan`, roll ±1.8° |
 | 1125–1349 | `pov` | вулиця від першої особи + плечі глядача | handheld 7 px, walk-cycle 1.85 Hz, POV-віньєтка |
-| 1350–1574 | `object-focus` | дорожній знак, ретикул, боке | zoom 1.7→1.95, CSS blur 7 px на далеких шарах |
-| 1575–1799 | `map` | тактична карта: маршрути, цілі, HUD | `static` + scanline, маркери й підписи |
+| 1350–1574 | `object-focus` | дорожній знак, ретикул, боке | zoom 1.7→1.95, CSS blur 7 px на далеких шарах; HUD: `warning` + `schematics` |
+| 1575–1799 | `map` | тактична карта: маршрути, цілі, HUD | `static` + scanline, маркери й підписи; плівка: `procedural_map` + `animated_routes` + `resource_markers` всередині `Layer depth={0.45}` |
 
 Порядок малювання в `World`: **Sky+Horizon (far plane, `backgroundBlur`) → Ground (`0.45 × blur`) → Midground → dust band (depth .92) → actors (depth 1) → Embers → Atmosphere → audio → text**. Підлога (`Ground`) навмисно під пропсами (`Midground`), інакше поверхня землі ховає декорації на середньому плані.
 
@@ -793,10 +819,13 @@ export const CHARACTERS = {
 
 ### 2.12 Interactive Prop Engine (`src/props/`)
 
-Інтерактивні предмети — третій модульний реєстр (поруч із локаціями та персонажами).
-Кожен проп — окремий SVG-компонент зі своїми станами, детермінованою анімацією від кадру
-та **interactionPoint** у координатах сцени для `Character.lookAt` і `CinematicShot.target`
-(`object-focus`).
+Інтерактивні предмети — третій модульний реєстр проєкту (поруч із локаціями та
+персонажами). Кожен проп — окремий SVG-компонент зі своїм набором станів, детермінованою
+анімацією від кадру та **interactionPoint** у координатах сцени. Ця точка використовується
+двома способами:
+
+- `Character.lookAt` — персонаж повертає зіниці/голову на предмет;
+- `CinematicShot.target` — камера `object-focus` ставить предмет у центр кадру.
 
 ```
 src/props/
@@ -814,25 +843,31 @@ src/props/
 └─ tools.tsx       idle | active | sparks
 ```
 
-#### Контракт
+#### Контракт `PropDefinition`
 
 | Поле / prop | Тип | Що робить |
 |---|---|---|
 | `x`, `y` | `number` (обов'язкові) | **нижній центр** артборду в координатах сцени (та сама площина, що `Character x/y`) |
 | `scale` | `number` | рівномірний масштаб; 1 = 1 одиниця артборду = 1 px сцени |
-| `state` | власний union | стан предмета; невідомий стан у `<Prop>` падає на `defaultState` |
-| `eventProgress` | `number` 0..1 | прогрес події: вібрація, відкривання, перегортання, іскри |
-| `seed` | `number` | детермінований seed; **без `Math.random()`** |
-| `frame` | `number?` | необов'язкове перекриття; за замовч. `useCurrentFrame()` |
-| `size`, `focus` | `{width,height}`, `PropPoint \| fn` | артборд і локальна точка фокуса → `interactionPoint` |
+| `state` | власний union (напр. `PhoneState`) | стан предмета; невідомий стан у `<Prop>` падає на `defaultState` |
+| `eventProgress` | `number` 0..1 | прогрес одноразової події: вібрація, відкривання дверей, перегортання, іскри |
+| `seed` | `number` | детермінований seed для іскор/крапель/мерехтіння; **без `Math.random()`** |
+| `frame` | `number?` | необов'язкове перекриття кадру; за замовчуванням `useCurrentFrame()` |
+| `style`, `className` | `CSSProperties`, `string?` | косметика контейнера |
+| `size.width/height` | `number` | розмір локального артборду (до `scale`) |
+| `focus` | `PropPoint \| (layout) => PropPoint` | локальна точка фокуса → `interactionPoint` через `resolvePropFocus` |
 | `states`, `defaultState` | `readonly TState[]`, `TState` | валідні стани та дефолт |
-| `Component` | `React.FC<PropProps<TState>>` | SVG-компонент |
+| `Component` | `React.FC<PropProps<TState>>` | сам SVG-компонент |
 
-**API реєстру:**
+**Реєстр (`src/props/index.ts`):**
 
 ```ts
 import {
-  PROPS, PROP_IDS, PROP_LIST, Prop, getPropInteractionPoint,
+  PROPS,                    // Record<PropId, PropDefinition<...>>
+  PROP_IDS,                 // PropId[]
+  PROP_LIST,                // PropSummary[] для HUD/доків
+  Prop,                     // <Prop id="..." ... /> — рендер за id
+  getPropInteractionPoint,  // (id, placement) => scene-space { x, y }
   Phone, Generator, Radio, Faucet, Pump, Tanks, Door, Notebook, Tools,
   phoneProp, generatorProp, radioProp, faucetProp, pumpProp,
   tanksProp, doorProp, notebookProp, toolsProp,
@@ -843,36 +878,50 @@ import {
 
 | `id` | Файл | Стани | Детермінована анімація | Демо-шот |
 |---|---|---|---|---|
-| `phone` | `phone.tsx` | `idle` \| `ringing` \| `broken` \| `off` | вібрація, миготіння екрана, хвилі виклику | `wide` (погляд Maya) |
-| `generator` | `generator.tsx` | `off` \| `running` \| `sparking` \| `broken` | тремтіння, обертання вала, дим, іскри, масло | `object-focus` |
-| `radio` | `radio.tsx` | `off` \| `static` \| `transmitting` | шум екрана, індикатори, звукові хвилі, LED | `medium` |
+| `phone` | `phone.tsx` | `idle` \| `ringing` \| `broken` \| `off` | вібрація корпусу, миготіння екрана, хвилі вхідного виклику | `wide` (погляд Maya) |
+| `generator` | `generator.tsx` | `off` \| `running` \| `sparking` \| `broken` | тремтіння корпусу, обертання вала/вентилятора, дим, іскри, масляна калюжа | `object-focus` |
+| `radio` | `radio.tsx` | `off` \| `static` \| `transmitting` | шум екрана, індикатори сигналу, звукові хвилі, LED | `medium` |
 | `faucet` | `faucet.tsx` | `closed` \| `dripping` \| `flowing` \| `dry` | обертання вентиля, краплі, струмінь, бризки | `pov` |
-| `pump` | `pump.tsx` | `idle` \| `pumping` \| `jammed` | поршень, маховик, тремтячий манометр, пара | `medium` |
-| `tanks` | `tanks.tsx` | `full` \| `half` \| `empty` \| `leaking` | рівень рідини, хвилі, бульбашки, витік | `wide` |
-| `door` | `door.tsx` | `closed` \| `opening` \| `open` \| `banging` | відчинення, колесо, удари, пил | `pov` |
-| `notebook` | `notebook.tsx` | `closed` \| `open` \| `flipping` | перегортання, рукопис, схема вежі | `medium` |
-| `tools` | `tools.tsx` | `idle` \| `active` \| `sparks` | викрутка, розігрів жала, іскри пайки | `object-focus` |
+| `pump` | `pump.tsx` | `idle` \| `pumping` \| `jammed` | рух поршня, маховик, тремтяча стрілка манометра, пара | `medium` |
+| `tanks` | `tanks.tsx` | `full` \| `half` \| `empty` \| `leaking` | рівень рідини, хвилі, бульбашки, тріщина й витік | `wide` |
+| `door` | `door.tsx` | `closed` \| `opening` \| `open` \| `banging` | плавне відчинення, обертання колеса, удари ззовні, пил | `pov` |
+| `notebook` | `notebook.tsx` | `closed` \| `open` \| `flipping` | перегортання сторінки, рукописні рядки, схема вежі | `medium` |
+| `tools` | `tools.tsx` | `idle` \| `active` \| `sparks` | обертання викрутки, розігрів жала, іскри пайки | `object-focus` |
 
-#### `lookAt` + `object-focus`
+#### Використання: `lookAt` + `object-focus`
 
 ```tsx
 import { Prop, getPropInteractionPoint } from "./props";
 
 const GENERATOR_SPOT = {
-  x: 540, y: 1660, scale: 1.45,
-  state: "sparking", eventProgress: 0.8, seed: 41,
+  x: 540,
+  y: 1660,
+  scale: 1.45,
+  state: "sparking",
+  eventProgress: 0.8,
+  seed: 41,
 } as const;
 
+// Та сама точка, що її бачить Character.lookAt і камера object-focus.
 const GENERATOR_FOCUS = getPropInteractionPoint("generator", GENERATOR_SPOT);
 
 <Character
   x={214}
   y={1780}
-  {...characterProps("engineer_noa", { armPose: "point", lookAt: GENERATOR_FOCUS })}
+  {...characterProps("engineer_noa", {
+    armPose: "point",
+    lookAt: GENERATOR_FOCUS,
+  })}
 />
+
 <Prop id="generator" {...GENERATOR_SPOT} />
 
-<CinematicShot type="object-focus" durationInFrames={225} target={GENERATOR_FOCUS}>
+<CinematicShot
+  type="object-focus"
+  durationInFrames={225}
+  target={GENERATOR_FOCUS}
+  label="OBJECT · GENERATOR"
+>
   {({ camera, fx }) => (
     <World camera={camera} backgroundBlur={fx.focusBlur}>
       <Prop id="generator" {...GENERATOR_SPOT} />
@@ -881,30 +930,212 @@ const GENERATOR_FOCUS = getPropInteractionPoint("generator", GENERATOR_SPOT);
 </CinematicShot>
 ```
 
-#### Покрокова інструкція: новий проп
+Прямий імпорт компонента теж працює:
 
-1. **`id`** у `snake_case` (`campfire`, `medkit`, `terminal`).
-2. **Створи `src/props/<id>.tsx`**: `export type <Name>State`, `<NAME>_STATES`,
-   `<NAME>_SIZE = { width, height } as const`.
-3. **Компонент** `React.FC<PropProps<State>>`: `usePropFrame(props)`, `eventLevel(...)`,
-   `layout: PropLayout<State>`, корінь `<div style={propContainerStyle(SIZE, layout, style)}>`,
-   всередині `<svg viewBox="0 0 W H" style={{ overflow: "visible" }}>`.
-4. **Малюй у локальних координатах**: низ артборду = земля, головний контур
-   `stroke={INK}` + `strokeWidth={PROP_OUTLINE}` (3 px). Усі `<defs>` — з `useId()`-префіксом.
-5. **Анімуй детерміновано:** `frame`, `sin/cos`, `loopPhase(frame, len, seed, i)`,
-   `pulse(frame, speed)`, `rand(seed, i)`. Заборонено `Math.random()`/`Date.now()`.
-6. **`eventProgress`** — смислова подія; у сцені можна передати `progress` із `CinematicShot`.
-7. **`focus`** — локальна точка (екран, полум'я, ручка); може залежати від `layout.state`.
-8. **Експортуй `<name>Prop: PropDefinition<State>`** з `id`, `name`, `description`,
-   `states`, `defaultState`, `size`, `focus`, `Component`.
-9. **Зареєструй** у `src/props/index.ts`: імпорт, `PROPS.<id> = <name>Prop`, експорт.
-10. **Постав у сцену** через `<Prop id="..." x y scale state />`; для погляду/камери —
-    `getPropInteractionPoint` з тими самими `x/y/scale/state`.
-11. **Перевір:** `npm run lint` + still-кадри (широкий план і `object-focus`).
+```tsx
+import { Phone } from "./props";
 
-**Граблі:** `y` — це низ артборду (не центр); однакові SVG `id` між копіями ламають
-градієнти (лікує `useId()`); не обгортай `<Prop>` у власний `<Layer>` (подвійний паралакс);
-порядок у `World` визначає, позаду чи перед персонажем стоїть предмет.
+<Phone x={1002} y={1724} scale={0.6} state="ringing" eventProgress={0.75} seed={23} />
+```
+
+#### Покрокова інструкція для агента: створити новий проп
+
+Коли користувач просить «додай проп X» (наприклад: `campfire`, `terminal`, `medkit`,
+`elevator`, `camera_drone`), виконай рівно ці кроки:
+
+1. **Придумай `id`** у `snake_case` (`campfire`, `medkit`, `terminal`). Це ключ реєстру;
+   `PropId` підхопить його автоматично.
+2. **Створи `src/props/<id>.tsx`** і почни з констант:
+
+```tsx
+export type CampfireState = "out" | "burning" | "dying";
+export const CAMPFIRE_STATES: readonly CampfireState[] = ["out", "burning", "dying"];
+export const CAMPFIRE_SIZE = { width: 320, height: 260 } as const;
+```
+
+3. **Оголоси компонент** `Campfire: React.FC<PropProps<CampfireState>>`. Усередині:
+   - `const { x, y, scale = 1, state, eventProgress = 0, seed = 0, style, className } = props;`
+   - `const frame = usePropFrame(props);` — єдине джерело часу;
+   - `const event = eventLevel(eventProgress);` — 0..1;
+   - `const layout: PropLayout<CampfireState> = { x, y, scale, state, eventProgress: event, seed };`
+   - кореневий `<div style={propContainerStyle(CAMPFIRE_SIZE, layout, style)}>`, всередині
+     `<svg width="100%" height="100%" viewBox="0 0 320 260" style={{ overflow: "visible" }}>`.
+4. **Малюй SVG у локальних координатах** `0..width × 0..height`, низ артборду = земля.
+   Головний контур — `stroke={INK}` + `strokeWidth={PROP_OUTLINE}` (3 px). Усі `<defs>`
+   отримують унікальний префікс: `const uid = \`fire-${React.useId().replace(/[^a-zA-Z0-9_-]/g, "")}\`;`
+   — інакше два однакові пропи на одному кадрі перетруть градієнти один одного.
+5. **Анімуй тільки детерміновано:** `frame`, `Math.sin/cos`, `loopPhase(frame, len, seed, i)`,
+   `pulse(frame, speed)`, `rand(seed, i)` з `src/Camera.tsx`. `Math.random()`, `Date.now()`,
+   `performance.now()` — заборонені.
+6. **Зроби `eventProgress` осмисленим:** спалах при старті, стрибок полум'я, відкривання,
+   постріл тощо. Якщо подія триває весь шот, у сцені передавай `progress` із
+   `<CinematicShot>`: `eventProgress={progress}`.
+7. **Задай `focus`** — локальну точку, на яку має дивитися персонаж/камера (полум'я,
+   екран, ручка, сопло). Вона може залежати від стану:
+   `focus: (layout) => layout.state === "dying" ? { x: 160, y: 210 } : { x: 160, y: 150 }`.
+8. **Експортуй визначення**:
+
+```tsx
+export const campfireProp: PropDefinition<CampfireState> = {
+  id: "campfire",
+  name: "Campfire",
+  description: "Low fire: out, burning with deterministic sparks, or dying embers.",
+  states: CAMPFIRE_STATES,
+  defaultState: "out",
+  size: CAMPFIRE_SIZE,
+  focus: { x: 160, y: 150 },
+  Component: Campfire,
+};
+```
+
+9. **Зареєструй у `src/props/index.ts`:** імпортуй `Campfire, campfireProp`, додай
+   `campfire: campfireProp` у `PROPS` (порядок = порядок у `PROP_LIST`) і додай обидва
+   імена у `export { ... }`.
+10. **Постав у сцену** через `<Prop id="campfire" x={...} y={...} scale={...} state="burning" />`
+    і, якщо треба погляд/фокус, порахуй точку:
+    `const FIRE = getPropInteractionPoint("campfire", { x, y, scale, state: "burning" });`
+    → `lookAt={FIRE}` або `target={FIRE}`.
+11. **Перевір:** `npm run lint`, потім still-кадри з пропом у кадрі (широкий план + крупний
+    `object-focus`). Дивись: предмет стоїть на землі (не висить), контур 3 px не з'їдений,
+    іскри/краплі не виходять за кадр, `lookAt` і `target` дійсно вказують на `focus`.
+
+**Заборонено:** використовувати `Math.random()`, дублювати SVG `id` між копіями пропа,
+вставляти растрові текстури, ламати існуючі `id` у `PROPS` (на них можуть посилатися сцени)
+та змінювати `size`/`focus` без перевірки `lookAt`/`object-focus`.
+
+#### Граблі пропів
+
+| Симптом | Причина / ліки |
+|---|---|
+| Проп «висить» у повітрі | `y` — це **низ** артборду, а не центр; постав `y` на лінію землі |
+| Погляд/камера дивиться не туди | для `lookAt`/`target` використовуй `getPropInteractionPoint` з тим самим `x/y/scale/state`, що й у `<Prop>` |
+| Два пропи перефарбовують один одного | однакові SVG `id` у `<defs>` — додай `useId()`-префікс |
+| Проп стрибає між кадрами | десь є `Math.random()` або час із `Date.now()` — лиши тільки `frame` + `rand(seed, i)` |
+| Проп не реагує на подію | `eventProgress` не переданий (дефолт 0) — передай `progress` із `CinematicShot` або явне число |
+| Проп закриває обличчя | порядок у `World` важливий: до `<Character>` = позаду, після = спереду; для `medium`/`closeup` став проп у проміжок між героями |
+| Подвійний паралакс / проп «пливе» | не обгортай `<Prop>` у власний `<Layer>` — `World` уже дає depth 1 |
+
+### 2.13 Infographic & UI Engine (`src/infographics/`)
+
+Інфографіка — четвертий модульний реєстр проєкту (поруч з локаціями, персонажами
+та пропами). Це **7 конфігуровних SVG-компонентів** для HUD, схем, лічильників і
+тактичних карт. Кожен компонент:
+
+- чистий `config`-драйвен артборд: вся поведінка — у полях конфігу, без пропсів-лічильників;
+- анімується **тільки від кадру** (`useInfoClock` → `useCurrentFrame`/`useVideoConfig`,
+  `enterSpring`, `progressIn`, `rand(seed, i)`); `Math.random()`/`Date.now()` заборонені;
+- малює контур **3 px** (`INFO_OUTLINE`) і важкий український дисплейний шрифт
+  (`INFO_DISPLAY` / `INFO_MONO` зі `shared.tsx`), як у решті фільму;
+- працює **і в screen-space HUD, і всередині плівки**: місце визначається тим, куди
+  ти його монтуєш (див. «Дві моделі розміщення» нижче).
+
+```
+src/infographics/
+├─ types.ts             InfographicPlacement, 7 config-типів, InfographicConfigMap,
+│                       InfographicProps, resolveInfoBox(), infoContainerStyle(), infoPoint()
+├─ shared.tsx           InfoSvg, useInfoClock, useUid, enterSpring, appear, progressIn,
+│                       staggerSpring, formatNumber, textWidth, палітра INFO/INFO_MONO/
+│                       INFO_DISPLAY/INFO_OUTLINE/STATUS_COLOR/RESOURCE_COLOR
+├─ ProceduralMap.tsx    procedural_map
+├─ ResourceMarkers.tsx  resource_markers
+├─ Counters.tsx         counters
+├─ Schematics.tsx       schematics
+├─ InventoryHUD.tsx     inventory
+├─ WarningBanner.tsx    warning
+├─ AnimatedRoutes.tsx   animated_routes
+└─ index.ts             реєстр INFOGRAPHICS, INFOGRAPHIC_IDS, INFOGRAPHIC_LIST,
+                        getInfographic(), <Infographic id="..." config={...} />
+```
+
+#### Сім компонентів
+
+| `id` | Компонент | Артборд за замовч. | Що малює | Демо-шот |
+|---|---|---|---|---|
+| `procedural_map` | `ProceduralMap` | 1080×1920 | процедурна тактична карта: сітка, райони-блоки, зони, radar/line-скан, мітки маршрути, HUD + компас | `map` (плівка) |
+| `resource_markers` | `ResourceMarkers` | 1080×1920 | масив пінів water/fuel/power/med/radiation з значенням, підписом і статусом ok/low/critical | `map` (плівка) |
+| `counters` | `Counters` | 560×380 | лічильники digital/bar/radial зі stagger-входом і анімованим відліком | `medium` (HUD) |
+| `schematics` | `Schematics` | 640×440 | схема живлення: вузли generator/pump/tank/junction/load, потоки power/water, аварійний разрив | `object-focus` (HUD) |
+| `inventory` | `InventoryHUD` | 420×640 | інвентар персонажа: 12 іконок, к-сть, активний слот, бар стану | `wide` (HUD) |
+| `warning` | `WarningBanner` | 972×190 | плашка caution/danger/critical: hazard-смуги, маячок, код ALERT | `object-focus` (HUD) |
+| `animated_routes` | `AnimatedRoutes` | 1080×1920 | маршрути з поступовим малюванням лінії, рухома стрілка, нумеровані waypoints, callout-лідери | `map` (плівка) |
+
+#### Дві моделі розміщення
+
+Будь-який конфіг розширює `InfographicPlacement` (`x/y/width/height/scale/opacity/
+frame/seed/delay/accent/style/className`). Координати пінів, вузлів і точок маршрутів —
+**нормовані 0..1** артборду, тому один конфіг працює при будь-якому `width/height`.
+
+- **Screen-space HUD** — монтуй `<Infographic />` безпосередньо у шоті, **після**
+  `</World>` (не всередину!): він не паралаксує і ліпить до кадру.
+- **Плівка (plate)** — монтуй всередині `<Layer camera={camera} depth={0.45}>`
+  (як у `ShotMap`): артборд успадковує камеру і рухається разом із картою.
+
+```tsx
+import { Infographic } from "./infographics";
+import type { CountersConfig, ResourceMarkersConfig } from "./infographics";
+
+const RESOURCE_METERS: CountersConfig = {
+  x: 560, y: 120, width: 466, height: 470,
+  title: "РЕСУРСИ ГРУПИ",
+  startFrame: 12, stagger: 6, duration: 52,
+  items: [
+    { label: "ВОДА", from: 0, to: 62, unit: "%", variant: "digital", max: 100, color: "#5AC8FF" },
+    { label: "ПАЛИВО", from: 0, to: 18, unit: "%", variant: "bar", max: 100, color: "#FFB01F", critical: true },
+    { label: "ЖИВЛЕННЯ", from: 0, to: 72, unit: "%", variant: "radial", max: 100, color: "#FFE066" },
+  ],
+};
+
+// HUD: після </World>
+<Infographic id="counters" config={RESOURCE_METERS} />
+
+// Plate: всередині шару карти
+<Layer camera={camera} depth={0.45}>
+  <Infographic id="procedural_map" config={MAP_PLATE} />
+  <Infographic id="animated_routes" config={MAP_ROUTES} />
+  <Infographic id="resource_markers" config={MAP_RESOURCES} />
+</Layer>
+```
+
+#### Покрокова інструкція для агента: додати свій інфографік
+
+1. **Придумай `id`** у `snake_case` (`weather_front`, `squad_status`). Це ключ реєстру;
+   `InfographicId` підхопить його автоматично.
+2. **Створи `src/infographics/<Id>.tsx`** (PascalCase файл): оголоси `const SIZE = { width, height }`,
+   компонент `React.FC<InfographicRenderProps<MyConfig>>` і визначення
+   `export const myInfographic = { id, name, titleUk, description, defaultSize: SIZE, usage: ["hud" | "plate"], Component } as const satisfies InfographicDefinition<"my_id", MyConfig>;`.
+3. **Розшир типи** у `types.ts`: `MyConfig = InfographicPlacement & { ... }` і додай рядок
+   `my_id: MyConfig;` у `InfographicConfigMap` — discriminated union `InfographicProps`
+   зробить `<Infographic id="my_id" config={...}/>` типобезпечним автоматично.
+4. **Малюй SVG** у локальних координатах `0..width × 0..height`: кореневий `<InfoSvg config={config} defaultSize={SIZE}>`,
+   усі `<defs>` з префіксом `useUid("myid")`, контур `strokeWidth={INFO_OUTLINE}`,
+   шрифти `INFO_DISPLAY`/`INFO_MONO`, кольori — з `INFO`/`STATUS_COLOR`/`RESOURCE_COLOR`.
+5. **Анімуй тільки детерміновано:** `const { frame, fps } = useInfoClock(props);`,
+   `enterSpring(frame, fps, config.delay ?? 0, 11)`, `progressIn(frame, start, dur)`,
+   `staggerSpring(...)`, `rand(seed, i)` з `shared.tsx`. Без `Math.random()`.
+6. **Зареєструй** у `src/infographics/index.ts`: імпорт, `my_id: myInfographic` у `INFOGRAPHICS`
+   (порядок = порядок у `INFOGRAPHIC_LIST`) і ім'я у `export { ... }`.
+7. **Постав у сцену** `MainScene.tsx`: HUD — після `</World>` у потрібному шоті; плівка —
+   всередину `<Layer camera={camera} depth={...}>`. Експорт конфігу як константи верхнього
+   рівня, щоб його було видно в diff.
+8. **Перевір:** `npm run lint`, потім still-кадри шоту, де ти монтував (див. §1.5).
+   Дивись: текст не перекривається з іншими HUD, гліфи не обрізані, контур 3 px цілий,
+   plate не «пливе» разом із камерою.
+9. **Онови документацію:** рядок у таблиці вище + приклад конфігу в цьому розділі.
+
+**Заборонено:** `Math.random()`/`Date.now()`, дублювати SVG `id` між копіями (префікс `useUid()`),
+ламати існуючі `id` у `INFOGRAPHICS` (на них зав'язані сцени), монтувати HUD всередину
+`<World>` (тоді він попливе разом із паралаксом) і рахувати координати в px замість нормованих 0..1.
+
+#### Граблі інфографіки
+
+| Симптом | Причина / ліки |
+|---|---|
+| HUD «пливе» разом із камерою | монтуй `<Infographic>` **після** `</World>`, а не всередину; plate — навпаки, всередину `<Layer>` |
+| Два інфографіки перефарбовують один одного | однакові SVG `id` у `<defs>` — кожен файл уже має `useUid()`-префікс, не прибивай його |
+| Мітка/маршрут не там, де треба | координати `x/y` пінів — нормовані 0..1 артборду, а не px кадру |
+| Елементи стрибають між кадрами | десь `Math.random()` або `Date.now()` — лиши `frame` + `rand(seed, i)` |
+| Конфіг не проходить `tsc` | `InfographicProps` — discriminated union: `config` має точно відповідати `id`; не додавай зайвих полів |
+| Напис не читається на спалаху | додай темну підкладку `rgba(4, 16, 25, 0.86)` за текстом, як у `MarkerLabel` |
 
 ---
 
@@ -1165,7 +1396,10 @@ python build_dialogue.py
 - Змінювати `look` існуючих пресетів та їхню стандартну поставу, не змінюючи `id`.
 - Ставити акторські пропси (`armPose`, `bodyPosture`, `headTilt`, `lookAt`, `isListening`, `voiceAmplitude`, `seed`) у будь-якому шоті `MainScene.tsx`.
 - Додавати нові риси зовнішності в `Character.tsx` — **тільки опційними пропсами** з дефолтом, що зберігає старий вигляд.
+- Нові пропи в `src/props/` (окремий файл + реєстрація в `PROPS`) та їхні стани/`eventProgress` у сценах.
 - Створювати нові локації у `src/locations/<name>/` за шаблоном `street/` і реєструвати їх у `src/locations/index.ts`.
+- Створювати нові інтерактивні пропи у `src/props/<id>.tsx` за шаблоном `phone.tsx` і реєструвати їх у `src/props/index.ts` (див. §2.12).
+- Створювати нові інфографіки у `src/infographics/<Name>.tsx` за рецептом §2.13 і реєструвати їх у `INFOGRAPHICS`; демо-конфіги — константами в `MainScene.tsx`.
 - Перемикати `location` у `MainScene.tsx`, `Root.tsx` або в окремих шотах (`<World location="...">`).
 - Тексти титрів, тайминги появ, гучності окремих звуків (з перевіркою кліпінгу).
 - Нові опційні пропси `Character`/`TextOverlays` з дефолтами.
@@ -1189,12 +1423,18 @@ python build_dialogue.py
 | Задній план не розмивається | передай `fx.focusBlur` у `<World backgroundBlur={fx.focusBlur}>`; `CinematicShot` не знає шарів локації |
 | Щілина в `top-down`/`map` | plate має bleed `-160..+160`, а `Layer` краще ставити з `depth 1` (top-down) або `0.45` (map); не збільшуй `shake` понад 1.5 |
 | Камера «стрибає» на карті | для `map` використовуй `motion="static"` і `shake ≤ 0.5`, інакше HUD-текст тремтить |
+| HUD «пливе» разом із камерою | монтуй `<Infographic>` після `</World>`, а не всередину; plate — навпаки, всередину `<Layer camera depth>` (§2.13) |
+| Мітка/маршрут не там, де треба | координати пінів у конфігу — нормовані 0..1 артборду, а не px кадру |
 | `target` не туди наводить | `target` — координати площини акторів (depth 1); для `Midground` (0.78) компенсуй зсув вручну |
 | Рот не рухається | не запущено `python build_dialogue.py` після зміни `public/voices/` або `isTalking` не збігається з Sequence |
 | Рот не рухається при `voiceAmplitude` | амплітуда < 0.03 у паузі — це нормально; перевір, що ти передаєш глобальний кадр `from + frame`, а не локальний `frame` |
 | Погляд «не туди» | `lookAt` — координати **сцени/площини акторів**, а не екрана після зуму; для `flipX` нічого компенсувати не треба, компонент робить це сам |
 | Очі персонажа заплющені на кожному кадрі | `rand(seed, i)` отримав однаковий `seed` у сусідів і збігся з морганням; дай унікальні `seed` у пресетах |
 | Руки «вросли» в корпус | `armPose` змінює геометрію плече→лікоть→зап'ясток; для `crossed`/`point`/`explain` руки малюються поверх куртки, не дублюй їх вручну |
+| Проп «висить» або провалюється під землю | `x/y` пропа — це **нижній центр** артборду; постав `y` на лінію землі (див. §2.12) |
+| `lookAt`/`object-focus` не на предмет | передай у `getPropInteractionPoint` ті самі `x/y/scale/state`, що й у `<Prop>`; не міняй `scale` після розрахунку |
+| Проп не анімується | не переданий `eventProgress` (дефолт 0) або використано `Math.random()`/`Date.now()` замість `frame` + `rand(seed, i)` |
+| Два пропи конфліктують градієнтами | однакові SVG `id` у `<defs>`; додай `React.useId()`-префікс у кожен файл `src/props/*.tsx` |
 | Борода з'їдає рот | зменш висоту бороди або дай `beardColor`, а не `hairColor`; рот малюється після бороди, але темний тон на темному не читається |
 | Капюшон ховає обличчя | `hood` малює обід поверх волосся; для крупних планів лишай `hood={false}` або піднімай `headTilt`
 | Тиша в кінці | немає фонового беду після останнього SFX — перевір `<Loop>` на `wind_ambient.wav` |
@@ -1219,6 +1459,16 @@ npx remotion still src/index.ts Popsikos2DAnimations out/acting-talk1.png --fram
 npx remotion still src/index.ts Popsikos2DAnimations out/acting-talk2.png --frame=112
 npx remotion still src/index.ts Popsikos2DAnimations out/acting-closeup.png --frame=560
 npx remotion still src/index.ts Popsikos2DAnimations out/acting-extreme.png --frame=785
+# інтерактивні пропи (wide / medium / pov / object-focus):
+npx remotion still src/index.ts Popsikos2DAnimations out/prop-wide.png --frame=110
+npx remotion still src/index.ts Popsikos2DAnimations out/prop-medium.png --frame=335
+npx remotion still src/index.ts Popsikos2DAnimations out/prop-pov.png --frame=1235
+npx remotion still src/index.ts Popsikos2DAnimations out/prop-object.png --frame=1460
+# інфографіка (inventory / counters / warning+schematics / map plate):
+npx remotion still src/index.ts Popsikos2DAnimations out/info-110.png --frame=110
+npx remotion still src/index.ts Popsikos2DAnimations out/info-335.png --frame=335
+npx remotion still src/index.ts Popsikos2DAnimations out/info-1460.png --frame=1460
+npx remotion still src/index.ts Popsikos2DAnimations out/info-1685.png --frame=1685
 # усі 8 шотів (wide, medium, closeup, extreme, top-down, pov, object-focus, map):
 npx remotion still src/index.ts Popsikos2DAnimations out/shot-1.png --frame=110
 npx remotion still src/index.ts Popsikos2DAnimations out/shot-3.png --frame=560

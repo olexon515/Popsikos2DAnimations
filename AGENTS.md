@@ -8,7 +8,7 @@
 
 ## 0. Що це і як почати за 5 хвилин
 
-**Popsikos2DAnimations** — вертикальні 2D-мультфільми на тему апокаліпсису: **1080×1920, 30 fps**, уся графіка — SVG + React, без 3D і без растрових ассетів. Декорації винесені в модульні локації (`src/locations/`), інтерактивні предмети — в **Interactive Prop Engine** (`src/props/`: телефон, генератор, рація, кран, насос, резервуари, гермодвері, блокнот, інструменти), звук синтезований локально (`generate_sfx.py`), озвучку реплік можна згенерувати через ElevenLabs (`generate_voices.py` → `public/voices/*.mp3`), а діалоги та lip-sync — з `public/voices/` (`build_dialogue.py`), титри — CSS-текст із comic-обводкою, а 8 кінематографічних планів (wide → map) дає `src/ShotEngine.tsx`. Акторська гра (5 поз рук, постава, погляд, авто-моргання, кивки, `voiceAmplitude`) живе в `src/Character.tsx`, а готові герої — модульні пресети в `src/characters/`.
+**Popsikos2DAnimations** — вертикальні 2D-мультфільми на тему апокаліпсису: **1080×1920, 30 fps**, уся графіка — SVG + React, без 3D і без растрових ассетів. Декорації винесені в модульні локації (`src/locations/`), інтерактивні предмети — в **Interactive Prop Engine** (`src/props/`: телефон, генератор, рація, кран, насос, резервуари, гермодвері, блокнот, інструменти), HUD/схеми/карти — в **Infographic & UI Engine** (`src/infographics/`: 7 конфігуровних компонентів), звук синтезований локально (`generate_sfx.py`), озвучку реплік можна згенерувати через ElevenLabs (`generate_voices.py` → `public/voices/*.mp3`), а діалоги та lip-sync — з `public/voices/` (`build_dialogue.py`), титри — CSS-текст із comic-обводкою, а 8 кінематографічних планів (wide → map) дає `src/ShotEngine.tsx`. Акторська гра (5 поз рук, постава, погляд, авто-моргання, кивки, `voiceAmplitude`) живе в `src/Character.tsx`, а готові герої — модульні пресети в `src/characters/`.
 
 | Параметр | Значення |
 |---|---|
@@ -20,6 +20,7 @@
 | Еталонний персонаж | `survivor_alex` (`src/characters/survivor_alex.ts`) |
 | Акторська система | `src/Character.tsx` — 5 поз рук, постава, погляд, моргання, `voiceAmplitude` (розділи 2.4, 2.10, 2.11) |
 | Інтерактивні пропи | `src/props/` — 9 SVG-предметів зі станами, `eventProgress`, seed та `interactionPoint` (розділ 2.12) |
+| Інфографіка та HUD | `src/infographics/` — 7 конфігуровних SVG-компонентів (карта, маркери, лічильники, схема, інвентар, попередження, маршрути; розділ 2.13) |
 | Фінальний рендер | `out/<назва>.mp4` (h264 + AAC 48 kHz stereo) |
 
 **Перші дії нового агента (з кореня проєкту):**
@@ -110,6 +111,20 @@ done
 `1235` — гермодвері та кран у `pov`; `1460` — генератор + інструменти в `object-focus`
 (перевіряй, що `lookAt` інженера й `target` камери дивляться в ту саму точку пропа).
 
+Кадри для перевірки інфографіки (після змін у `src/infographics/` або демо-конфігах
+у `MainScene.tsx`) — ті самі кадри шотів, дивись лише HUD/плівку:
+
+```bash
+for f in 110 335 1460 1685; do
+  npx remotion still src/index.ts Popsikos2DAnimations out/info-$f.png --frame=$f
+done
+```
+
+`110` — `inventory` у `wide`; `335` — `counters` у `medium`; `1460` — `warning` +
+`schematics` у `object-focus`; `1685` — `procedural_map` + `animated_routes` +
+`resource_markers` у `map`. Дивись: написи не перекриваються між собою й з титрами,
+гліфи не обрізані, контур 3 px цілий, plate не «пливе» разом із камерою.
+
 ### 1.6 Перевірка готового відео
 
 ```bash
@@ -157,6 +172,10 @@ ffmpeg -v info -ss 9 -t 1 -i out/episode.mp4 -vn -af volumedetect -f null NUL 2>
 | `src/Camera.tsx` | тип `Camera`, компонент `Layer` (паралакс), `cameraTransform`, `rand`, `clamp`, `lerp`, `smoothstep`, `STATIC_CAMERA` |
 | `src/ShotEngine.tsx` | **Cinematic Shot Engine**: 8 пресетів (`ShotType`), `<CinematicShot>`, `TopDownPlate`, `TacticalMap` |
 | `src/TextOverlays.tsx` | `HookTitle` + `DynamicCaption` (spring, обводка, градієнт) |
+| `src/infographics/types.ts` | контракт інфографіки: `InfographicPlacement`, 7 config-типів, `InfographicConfigMap`, `InfographicProps`, `resolveInfoBox()`, `infoPoint()` |
+| `src/infographics/index.ts` | реєстр `INFOGRAPHICS`, `INFOGRAPHIC_IDS`, `getInfographic()`, типовий `<Infographic id="..." config={...} />` |
+| `src/infographics/shared.tsx` | `InfoSvg`, `useInfoClock`, `useUid`, `enterSpring`, `appear`, `progressIn`, `staggerSpring`, `formatNumber`, `textWidth`, палітра `INFO` |
+| `src/infographics/<Name>.tsx` | 7 компонентів: `ProceduralMap`, `ResourceMarkers`, `Counters`, `Schematics`, `InventoryHUD`, `WarningBanner`, `AnimatedRoutes` |
 | `src/dialogueTimeline.ts` | автогенерований таймлайн реплік і lip-sync огинаючих із `public/voices/` |
 | `src/locations/types.ts` | TypeScript-інтерфейс `LocationDefinition`, `LocationLayerProps`, `LocationSkyProps` |
 | `src/locations/index.ts` | реєстр локацій `LOCATIONS`, тип `LocationId`, `DEFAULT_LOCATION`, `getLocation()` |
@@ -191,8 +210,8 @@ ffmpeg -v info -ss 9 -t 1 -i out/episode.mp4 -vn -af volumedetect -f null NUL 2>
 | 675–899 | `extreme-closeup` | очі Maya в goggles на весь кадр | zoom 2.1→2.4, імпульс входу 7 кадрів, вібрація, grain |
 | 900–1124 | `top-down` | маківки героїв, мангал/знак/дерево зверху | plate + орбітальний `pan`, roll ±1.8° |
 | 1125–1349 | `pov` | вулиця від першої особи + плечі глядача | handheld 7 px, walk-cycle 1.85 Hz, POV-віньєтка |
-| 1350–1574 | `object-focus` | дорожній знак, ретикул, боке | zoom 1.7→1.95, CSS blur 7 px на далеких шарах |
-| 1575–1799 | `map` | тактична карта: маршрути, цілі, HUD | `static` + scanline, маркери й підписи |
+| 1350–1574 | `object-focus` | дорожній знак, ретикул, боке | zoom 1.7→1.95, CSS blur 7 px на далеких шарах; HUD: `warning` + `schematics` |
+| 1575–1799 | `map` | тактична карта: маршрути, цілі, HUD | `static` + scanline, маркери й підписи; плівка: `procedural_map` + `animated_routes` + `resource_markers` всередині `Layer depth={0.45}` |
 
 Порядок малювання в `World`: **Sky+Horizon (far plane, `backgroundBlur`) → Ground (`0.45 × blur`) → Midground → dust band (depth .92) → actors (depth 1) → Embers → Atmosphere → audio → text**. Підлога (`Ground`) навмисно під пропсами (`Midground`), інакше поверхня землі ховає декорації на середньому плані.
 
@@ -992,6 +1011,128 @@ export const campfireProp: PropDefinition<CampfireState> = {
 | Проп закриває обличчя | порядок у `World` важливий: до `<Character>` = позаду, після = спереду; для `medium`/`closeup` став проп у проміжок між героями |
 | Подвійний паралакс / проп «пливе» | не обгортай `<Prop>` у власний `<Layer>` — `World` уже дає depth 1 |
 
+### 2.13 Infographic & UI Engine (`src/infographics/`)
+
+Інфографіка — четвертий модульний реєстр проєкту (поруч з локаціями, персонажами
+та пропами). Це **7 конфігуровних SVG-компонентів** для HUD, схем, лічильників і
+тактичних карт. Кожен компонент:
+
+- чистий `config`-драйвен артборд: вся поведінка — у полях конфігу, без пропсів-лічильників;
+- анімується **тільки від кадру** (`useInfoClock` → `useCurrentFrame`/`useVideoConfig`,
+  `enterSpring`, `progressIn`, `rand(seed, i)`); `Math.random()`/`Date.now()` заборонені;
+- малює контур **3 px** (`INFO_OUTLINE`) і важкий український дисплейний шрифт
+  (`INFO_DISPLAY` / `INFO_MONO` зі `shared.tsx`), як у решті фільму;
+- працює **і в screen-space HUD, і всередині плівки**: місце визначається тим, куди
+  ти його монтуєш (див. «Дві моделі розміщення» нижче).
+
+```
+src/infographics/
+├─ types.ts             InfographicPlacement, 7 config-типів, InfographicConfigMap,
+│                       InfographicProps, resolveInfoBox(), infoContainerStyle(), infoPoint()
+├─ shared.tsx           InfoSvg, useInfoClock, useUid, enterSpring, appear, progressIn,
+│                       staggerSpring, formatNumber, textWidth, палітра INFO/INFO_MONO/
+│                       INFO_DISPLAY/INFO_OUTLINE/STATUS_COLOR/RESOURCE_COLOR
+├─ ProceduralMap.tsx    procedural_map
+├─ ResourceMarkers.tsx  resource_markers
+├─ Counters.tsx         counters
+├─ Schematics.tsx       schematics
+├─ InventoryHUD.tsx     inventory
+├─ WarningBanner.tsx    warning
+├─ AnimatedRoutes.tsx   animated_routes
+└─ index.ts             реєстр INFOGRAPHICS, INFOGRAPHIC_IDS, INFOGRAPHIC_LIST,
+                        getInfographic(), <Infographic id="..." config={...} />
+```
+
+#### Сім компонентів
+
+| `id` | Компонент | Артборд за замовч. | Що малює | Демо-шот |
+|---|---|---|---|---|
+| `procedural_map` | `ProceduralMap` | 1080×1920 | процедурна тактична карта: сітка, райони-блоки, зони, radar/line-скан, мітки маршрути, HUD + компас | `map` (плівка) |
+| `resource_markers` | `ResourceMarkers` | 1080×1920 | масив пінів water/fuel/power/med/radiation з значенням, підписом і статусом ok/low/critical | `map` (плівка) |
+| `counters` | `Counters` | 560×380 | лічильники digital/bar/radial зі stagger-входом і анімованим відліком | `medium` (HUD) |
+| `schematics` | `Schematics` | 640×440 | схема живлення: вузли generator/pump/tank/junction/load, потоки power/water, аварійний разрив | `object-focus` (HUD) |
+| `inventory` | `InventoryHUD` | 420×640 | інвентар персонажа: 12 іконок, к-сть, активний слот, бар стану | `wide` (HUD) |
+| `warning` | `WarningBanner` | 972×190 | плашка caution/danger/critical: hazard-смуги, маячок, код ALERT | `object-focus` (HUD) |
+| `animated_routes` | `AnimatedRoutes` | 1080×1920 | маршрути з поступовим малюванням лінії, рухома стрілка, нумеровані waypoints, callout-лідери | `map` (плівка) |
+
+#### Дві моделі розміщення
+
+Будь-який конфіг розширює `InfographicPlacement` (`x/y/width/height/scale/opacity/
+frame/seed/delay/accent/style/className`). Координати пінів, вузлів і точок маршрутів —
+**нормовані 0..1** артборду, тому один конфіг працює при будь-якому `width/height`.
+
+- **Screen-space HUD** — монтуй `<Infographic />` безпосередньо у шоті, **після**
+  `</World>` (не всередину!): він не паралаксує і ліпить до кадру.
+- **Плівка (plate)** — монтуй всередині `<Layer camera={camera} depth={0.45}>`
+  (як у `ShotMap`): артборд успадковує камеру і рухається разом із картою.
+
+```tsx
+import { Infographic } from "./infographics";
+import type { CountersConfig, ResourceMarkersConfig } from "./infographics";
+
+const RESOURCE_METERS: CountersConfig = {
+  x: 560, y: 120, width: 466, height: 470,
+  title: "РЕСУРСИ ГРУПИ",
+  startFrame: 12, stagger: 6, duration: 52,
+  items: [
+    { label: "ВОДА", from: 0, to: 62, unit: "%", variant: "digital", max: 100, color: "#5AC8FF" },
+    { label: "ПАЛИВО", from: 0, to: 18, unit: "%", variant: "bar", max: 100, color: "#FFB01F", critical: true },
+    { label: "ЖИВЛЕННЯ", from: 0, to: 72, unit: "%", variant: "radial", max: 100, color: "#FFE066" },
+  ],
+};
+
+// HUD: після </World>
+<Infographic id="counters" config={RESOURCE_METERS} />
+
+// Plate: всередині шару карти
+<Layer camera={camera} depth={0.45}>
+  <Infographic id="procedural_map" config={MAP_PLATE} />
+  <Infographic id="animated_routes" config={MAP_ROUTES} />
+  <Infographic id="resource_markers" config={MAP_RESOURCES} />
+</Layer>
+```
+
+#### Покрокова інструкція для агента: додати свій інфографік
+
+1. **Придумай `id`** у `snake_case` (`weather_front`, `squad_status`). Це ключ реєстру;
+   `InfographicId` підхопить його автоматично.
+2. **Створи `src/infographics/<Id>.tsx`** (PascalCase файл): оголоси `const SIZE = { width, height }`,
+   компонент `React.FC<InfographicRenderProps<MyConfig>>` і визначення
+   `export const myInfographic = { id, name, titleUk, description, defaultSize: SIZE, usage: ["hud" | "plate"], Component } as const satisfies InfographicDefinition<"my_id", MyConfig>;`.
+3. **Розшир типи** у `types.ts`: `MyConfig = InfographicPlacement & { ... }` і додай рядок
+   `my_id: MyConfig;` у `InfographicConfigMap` — discriminated union `InfographicProps`
+   зробить `<Infographic id="my_id" config={...}/>` типобезпечним автоматично.
+4. **Малюй SVG** у локальних координатах `0..width × 0..height`: кореневий `<InfoSvg config={config} defaultSize={SIZE}>`,
+   усі `<defs>` з префіксом `useUid("myid")`, контур `strokeWidth={INFO_OUTLINE}`,
+   шрифти `INFO_DISPLAY`/`INFO_MONO`, кольori — з `INFO`/`STATUS_COLOR`/`RESOURCE_COLOR`.
+5. **Анімуй тільки детерміновано:** `const { frame, fps } = useInfoClock(props);`,
+   `enterSpring(frame, fps, config.delay ?? 0, 11)`, `progressIn(frame, start, dur)`,
+   `staggerSpring(...)`, `rand(seed, i)` з `shared.tsx`. Без `Math.random()`.
+6. **Зареєструй** у `src/infographics/index.ts`: імпорт, `my_id: myInfographic` у `INFOGRAPHICS`
+   (порядок = порядок у `INFOGRAPHIC_LIST`) і ім'я у `export { ... }`.
+7. **Постав у сцену** `MainScene.tsx`: HUD — після `</World>` у потрібному шоті; плівка —
+   всередину `<Layer camera={camera} depth={...}>`. Експорт конфігу як константи верхнього
+   рівня, щоб його було видно в diff.
+8. **Перевір:** `npm run lint`, потім still-кадри шоту, де ти монтував (див. §1.5).
+   Дивись: текст не перекривається з іншими HUD, гліфи не обрізані, контур 3 px цілий,
+   plate не «пливе» разом із камерою.
+9. **Онови документацію:** рядок у таблиці вище + приклад конфігу в цьому розділі.
+
+**Заборонено:** `Math.random()`/`Date.now()`, дублювати SVG `id` між копіями (префікс `useUid()`),
+ламати існуючі `id` у `INFOGRAPHICS` (на них зав'язані сцени), монтувати HUD всередину
+`<World>` (тоді він попливе разом із паралаксом) і рахувати координати в px замість нормованих 0..1.
+
+#### Граблі інфографіки
+
+| Симптом | Причина / ліки |
+|---|---|
+| HUD «пливе» разом із камерою | монтуй `<Infographic>` **після** `</World>`, а не всередину; plate — навпаки, всередину `<Layer>` |
+| Два інфографіки перефарбовують один одного | однакові SVG `id` у `<defs>` — кожен файл уже має `useUid()`-префікс, не прибивай його |
+| Мітка/маршрут не там, де треба | координати `x/y` пінів — нормовані 0..1 артборду, а не px кадру |
+| Елементи стрибають між кадрами | десь `Math.random()` або `Date.now()` — лиши `frame` + `rand(seed, i)` |
+| Конфіг не проходить `tsc` | `InfographicProps` — discriminated union: `config` має точно відповідати `id`; не додавай зайвих полів |
+| Напис не читається на спалаху | додай темну підкладку `rgba(4, 16, 25, 0.86)` за текстом, як у `MarkerLabel` |
+
 ---
 
 ## 3. Звук та озвучка
@@ -1254,6 +1395,7 @@ python build_dialogue.py
 - Нові пропи в `src/props/` (окремий файл + реєстрація в `PROPS`) та їхні стани/`eventProgress` у сценах.
 - Створювати нові локації у `src/locations/<name>/` за шаблоном `street/` і реєструвати їх у `src/locations/index.ts`.
 - Створювати нові інтерактивні пропи у `src/props/<id>.tsx` за шаблоном `phone.tsx` і реєструвати їх у `src/props/index.ts` (див. §2.12).
+- Створювати нові інфографіки у `src/infographics/<Name>.tsx` за рецептом §2.13 і реєструвати їх у `INFOGRAPHICS`; демо-конфіги — константами в `MainScene.tsx`.
 - Перемикати `location` у `MainScene.tsx`, `Root.tsx` або в окремих шотах (`<World location="...">`).
 - Тексти титрів, тайминги появ, гучності окремих звуків (з перевіркою кліпінгу).
 - Нові опційні пропси `Character`/`TextOverlays` з дефолтами.
@@ -1277,6 +1419,8 @@ python build_dialogue.py
 | Задній план не розмивається | передай `fx.focusBlur` у `<World backgroundBlur={fx.focusBlur}>`; `CinematicShot` не знає шарів локації |
 | Щілина в `top-down`/`map` | plate має bleed `-160..+160`, а `Layer` краще ставити з `depth 1` (top-down) або `0.45` (map); не збільшуй `shake` понад 1.5 |
 | Камера «стрибає» на карті | для `map` використовуй `motion="static"` і `shake ≤ 0.5`, інакше HUD-текст тремтить |
+| HUD «пливе» разом із камерою | монтуй `<Infographic>` після `</World>`, а не всередину; plate — навпаки, всередину `<Layer camera depth>` (§2.13) |
+| Мітка/маршрут не там, де треба | координати пінів у конфігу — нормовані 0..1 артборду, а не px кадру |
 | `target` не туди наводить | `target` — координати площини акторів (depth 1); для `Midground` (0.78) компенсуй зсув вручну |
 | Рот не рухається | не запущено `python build_dialogue.py` після зміни `public/voices/` або `isTalking` не збігається з Sequence |
 | Рот не рухається при `voiceAmplitude` | амплітуда < 0.03 у паузі — це нормально; перевір, що ти передаєш глобальний кадр `from + frame`, а не локальний `frame` |
@@ -1316,6 +1460,11 @@ npx remotion still src/index.ts Popsikos2DAnimations out/prop-wide.png --frame=1
 npx remotion still src/index.ts Popsikos2DAnimations out/prop-medium.png --frame=335
 npx remotion still src/index.ts Popsikos2DAnimations out/prop-pov.png --frame=1235
 npx remotion still src/index.ts Popsikos2DAnimations out/prop-object.png --frame=1460
+# інфографіка (inventory / counters / warning+schematics / map plate):
+npx remotion still src/index.ts Popsikos2DAnimations out/info-110.png --frame=110
+npx remotion still src/index.ts Popsikos2DAnimations out/info-335.png --frame=335
+npx remotion still src/index.ts Popsikos2DAnimations out/info-1460.png --frame=1460
+npx remotion still src/index.ts Popsikos2DAnimations out/info-1685.png --frame=1685
 # усі 8 шотів (wide, medium, closeup, extreme, top-down, pov, object-focus, map):
 npx remotion still src/index.ts Popsikos2DAnimations out/shot-1.png --frame=110
 npx remotion still src/index.ts Popsikos2DAnimations out/shot-3.png --frame=560
